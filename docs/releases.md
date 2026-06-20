@@ -1,6 +1,13 @@
 # Releases
 
-Concise V1 release notes. Detailed experiment rationale lives in `docs/latency-optimization-attempts.md`; stable conclusions live in `docs/latency-findings.md`.
+Concise release notes. Detailed experiment rationale lives in `docs/latency-optimization-attempts.md`; stable conclusions live in `docs/latency-findings.md`.
+
+## v2.0.0
+
+- Added independent V2 entrypoint, config, package path, and tuner.
+- V2 keeps the V1 detection -> PIDF -> KMBox chain but filters target state with a constant-velocity Kalman model.
+- Kalman state is `[x, y, vx, vy]`; filtered position and velocity feed the existing PIDF controller.
+- V1 runtime files and config schema remain unchanged.
 
 ## v1.2.3
 

@@ -21,6 +21,14 @@ from .v1 import (
     summarize_records,
     summarize_run,
 )
+from .v2 import (
+    AIMBOT_V2_VERSION,
+    AimbotConfigV2,
+    AimbotV2,
+    KalmanFilter2D,
+    KalmanState,
+    PIDFControllerV2,
+)
 
 __all__ = [
     "AimbotConfigV1",
@@ -44,4 +52,10 @@ __all__ = [
     "summarize_records",
     "summarize_run",
     "WebTuner",
+    "AimbotConfigV2",
+    "AIMBOT_V2_VERSION",
+    "AimbotV2",
+    "KalmanFilter2D",
+    "KalmanState",
+    "PIDFControllerV2",
 ]
