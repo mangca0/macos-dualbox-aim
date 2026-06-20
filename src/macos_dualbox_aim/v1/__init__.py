@@ -1,5 +1,6 @@
 from .config import AIMBOT_V1_VERSION, AimbotConfigV1
 from .controller import AimbotV1, PIDFControllerV1, Target
+from .capture_probe import CaptureMode, CaptureProbeResult, probe_capture_mode
 from .hotkey import HotkeyConfig, HotkeyMonitor
 from .inference import DetectionResult, RealtimeInference
 from .kmbox import KmboxConfig, KmboxNet, SUCCESS
@@ -10,6 +11,8 @@ __all__ = [
     "AimbotConfigV1",
     "AIMBOT_V1_VERSION",
     "AimbotV1",
+    "CaptureMode",
+    "CaptureProbeResult",
     "PIDFControllerV1",
     "Target",
     "HotkeyConfig",
@@ -25,4 +28,5 @@ __all__ = [
     "summarize_records",
     "summarize_run",
     "WebTuner",
+    "probe_capture_mode",
 ]

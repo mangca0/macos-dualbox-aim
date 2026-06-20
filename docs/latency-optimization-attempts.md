@@ -1,5 +1,26 @@
 # Latency Optimization Attempts
 
+## 2026-06-20: V1.2.0 capture mode probe release
+
+### Status
+
+Released as an experiment-support version.
+
+### Goal
+
+Support the next capture backend/device-mode optimization pass without changing aim runtime behavior. The probe is meant to identify which requested color format, FPS, resolution, and backend combination actually produces lower capture latency on the current hardware.
+
+### Changes
+
+- Added `scripts/capture_probe.py` for matrix testing capture modes outside the main aimbot process.
+- Records requested mode, actual backend/FPS/resolution/FourCC/buffer size, open/configure time, `grab`/`retrieve` timing, frame interval, effective FPS, and failure counters.
+- Supports Markdown and JSONL output for later comparison.
+- Exports `CaptureMode`, `CaptureProbeResult`, and `probe_capture_mode` from the V1 package.
+
+### Decision
+
+Do not auto-apply probe winners to `configs/config_v1.json`. Use probe output to choose one candidate mode, then validate it in the normal V1 tuner latency capture.
+
 ## 2026-06-20: V1.1.1 capture diagnostics release
 
 ### Status
