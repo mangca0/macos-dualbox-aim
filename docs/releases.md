@@ -2,6 +2,13 @@
 
 Concise V1 release notes. Detailed experiment rationale lives in `docs/latency-optimization-attempts.md`; stable conclusions live in `docs/latency-findings.md`.
 
+## v1.2.3
+
+- Rolled main runtime capture back to the V1.0 `capture.read()` path.
+- Removed main-runtime grab/retrieve/frame-interval diagnostics from tuner snapshots and UI.
+- Kept external latency/capture probe scripts for offline exploration.
+- No aim control, CoreML model, target selection, PIDF, or KMBox behavior change beyond the capture read-path rollback.
+
 ## v1.2.2
 
 - Added `--load-placement inline|thread` to `scripts/capture_probe.py`.

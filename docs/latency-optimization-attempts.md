@@ -1,5 +1,26 @@
 # Latency Optimization Attempts
 
+## 2026-06-20: V1.2.3 main runtime rollback
+
+### Status
+
+Released as a rollback version.
+
+### Goal
+
+Return the main aimbot runtime to the V1.0 capture behavior after V1.1-V1.2 exploration failed to produce a practical latency improvement.
+
+### Changes
+
+- Restored `RealtimeInference._capture_loop()` to use OpenCV `capture.read()` instead of explicit `grab()`/`retrieve()`.
+- Removed main-runtime capture backend/property diagnostics from latency snapshots.
+- Removed capture grab/retrieve/frame-interval rows and failure counters from the Web tuner UI.
+- Kept standalone `scripts/capture_probe.py` and `scripts/latency_tool.py` for offline diagnosis.
+
+### Decision
+
+Do not carry observation-only capture instrumentation inside the main runtime when the user wants a clean rollback. Future latency experiments should stay outside the runtime first, or be added behind an explicit short-lived diagnostic version.
+
 ## 2026-06-20: V1.2.2 threaded capture load probe release
 
 ### Status

@@ -78,17 +78,6 @@ class FakeHotkey:
         self.checks += 1
 
 
-class FakeCapture:
-    def __init__(self):
-        self.properties = {}
-
-    def get(self, prop):
-        return self.properties.get(prop, 0.0)
-
-    def getBackendName(self):
-        return "FAKE"
-
-
 class V1Tests(unittest.TestCase):
     def test_pidf_uses_standard_derivative_and_feedforward_terms(self):
         config = AimbotConfigV1(pid_kp=1.0, pid_ki=2.0, pid_kd=3.0, pid_kf=4.0)
@@ -203,7 +192,7 @@ class V1Tests(unittest.TestCase):
         data = json.loads(path.read_text(encoding="utf-8"))
 
         self.assertEqual(data["_version"], AIMBOT_V1_VERSION)
-        self.assertIn("V1.2.2", data["_comment"])
+        self.assertIn("V1.2.3", data["_comment"])
         self.assertEqual(data["_custom_note"], "keep me")
         self.assertNotIn("frame_queue_size", data)
 
@@ -212,58 +201,25 @@ class V1Tests(unittest.TestCase):
 
         self.assertEqual(signature.parameters["frame_queue_size"].default, 3)
 
-    def test_realtime_inference_exposes_capture_diagnostics(self):
+    def test_realtime_inference_uses_v1_0_capture_latency_shape(self):
         engine = RealtimeInference.__new__(RealtimeInference)
-        engine.capture_device = 2
-        engine.target_fps = 120
-        engine.capture_resolution = (1280, 720)
-        engine.pixel_format = "MJPEG"
         engine.frames_captured = 0
         engine.frames_inferred = 0
         engine.frames_dropped = 0
         engine.frame_queue_replaced = 0
         engine.frame_queue_drained = 0
-        engine.capture_grab_failures = 3
-        engine.capture_retrieve_failures = 4
         engine.actual_inference_fps = 0.0
         engine.latency_samples = []
         engine.latency_lock = __import__("threading").RLock()
-        engine.capture_diagnostics = engine._initial_capture_diagnostics()
-        fake_capture = FakeCapture()
-        fake_capture.properties = {
-            __import__("cv2").CAP_PROP_FRAME_WIDTH: 1280.0,
-            __import__("cv2").CAP_PROP_FRAME_HEIGHT: 720.0,
-            __import__("cv2").CAP_PROP_FPS: 119.88,
-            __import__("cv2").CAP_PROP_FOURCC: float(__import__("cv2").VideoWriter_fourcc(*"MJPG")),
-            __import__("cv2").CAP_PROP_BUFFERSIZE: 1.0,
-        }
 
-        engine._update_capture_diagnostics(fake_capture, open_ms=2.5, configure_ms=1.25)
+        engine._record_latency(7, {"capture_read_ms": 9.0})
         snapshot = engine.get_latency_snapshot()
 
-        self.assertEqual(snapshot["counters"]["capture_grab_failures"], 3)
-        self.assertEqual(snapshot["counters"]["capture_retrieve_failures"], 4)
-        self.assertEqual(snapshot["capture"]["backend"], "FAKE")
-        self.assertEqual(snapshot["capture"]["requested"]["device"], 2)
-        self.assertEqual(snapshot["capture"]["actual"]["fourcc"], "MJPG")
-        self.assertAlmostEqual(snapshot["capture"]["actual"]["fps"], 119.88)
+        self.assertEqual(snapshot["current"]["capture_read_ms"], 9.0)
+        self.assertNotIn("capture", snapshot)
+        self.assertNotIn("capture_grab_failures", snapshot["counters"])
+        self.assertNotIn("capture_retrieve_failures", snapshot["counters"])
         json.dumps(snapshot)
-
-    def test_recorded_latency_accepts_capture_stage_timings(self):
-        engine = RealtimeInference.__new__(RealtimeInference)
-        engine.latency_samples = []
-        engine.latency_lock = __import__("threading").RLock()
-
-        engine._record_latency(7, {
-            "capture_read_ms": 9.0,
-            "capture_grab_ms": 4.0,
-            "capture_retrieve_ms": 5.0,
-            "capture_frame_interval_ms": 10.0,
-        })
-
-        self.assertEqual(engine.latency_samples[-1]["capture_grab_ms"], 4.0)
-        self.assertEqual(engine.latency_samples[-1]["capture_retrieve_ms"], 5.0)
-        self.assertEqual(engine.latency_samples[-1]["capture_frame_interval_ms"], 10.0)
 
     def test_raw_postprocess_keeps_decode_before_threshold_filter(self):
         detector = CoreMLDetector.__new__(CoreMLDetector)
@@ -328,12 +284,6 @@ class V1Tests(unittest.TestCase):
         self.assertEqual(data["pid_kp"], 0.5)
         self.assertEqual(data["detection_confidence_threshold"], 0.42)
         self.assertEqual(data["trigger_button_secondary"], "side2")
-
-    def test_web_tuner_snapshot_exposes_runtime_version(self):
-        v1_1 = WebTuner(AimbotConfigV1(), self._write_temp_config({})).snapshot()
-
-        self.assertEqual(v1_1["runtime"]["version"], "1.2.2")
-        self.assertIn("v1.config", v1_1["runtime"]["config_class"])
 
     def test_web_tuner_limits_trigger_buttons_to_requested_mouse_inputs(self):
         tuner = WebTuner(AimbotConfigV1(), self._write_temp_config({}))

@@ -3,7 +3,7 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Set
 
-AIMBOT_V1_VERSION = "1.2.2"
+AIMBOT_V1_VERSION = "1.2.3"
 
 BUTTON_NAMES = {"left", "right", "middle", "side1", "side2"}
 LOCK_MODES = {"toggle", "hold"}
@@ -162,7 +162,7 @@ class AimbotConfigV1:
 
     def to_json(self, path: str | Path):
         data: Dict[str, Any] = {
-            "_comment": "macos-dualbox-aim V1.2.2 - V1.0 runtime behavior with threaded capture load probe tooling",
+            "_comment": "macos-dualbox-aim V1.2.3 - main runtime rolled back to V1.0 behavior; external latency tooling retained",
             "_version": AIMBOT_V1_VERSION,
             "_description": "capture -> CoreML detections -> screen-center bbox error -> aim offset -> PIDF -> KMBox",
         }

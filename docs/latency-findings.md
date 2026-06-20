@@ -7,14 +7,15 @@ This file records stable conclusions from V1 latency experiments. Raw captures a
 - Total measured runtime latency is dominated by capture and CoreML inference.
 - In V1.1.0 comparisons, `capture_read_ms` was about 45% of `read_included_total_ms`, and `coreml_ms` was about 42%.
 - Control-side work is not a first-order latency target right now: `target_select_ms`, `pid_ms`, and `kmbox_send_ack_ms` are sub-millisecond in the collected runs.
+- As of V1.2.3, the main runtime is rolled back to the V1.0 `capture.read()` path. Fine-grained grab/retrieve/frame-interval diagnostics remain available only through the standalone capture probe.
 
 ## Capture Path
 
 - At 1920x1080, AVFoundation appears to deliver about 120fps in practice, even when 240fps is requested.
 - Color format switching did not produce meaningful capture latency differences in the V1.2.0 probe. MJPEG, YUY2, UYVY, RGB3, and BGR3 were all within about 0.1-0.2 ms in the tested matrix.
-- The capture read cost is mostly `capture_grab_ms`, which points to waiting for the backend/device to deliver a frame, not expensive post-retrieve processing.
-- `capture_retrieve_ms` is usually small, but can spike in the main runtime p95. That makes tail latency worth watching even when average retrieve time looks harmless.
-- OpenCV/AVFoundation reported properties are not always enough. Prefer measured `capture_frame_interval_ms` and `effective_fps` over only trusting reported FPS.
+- In diagnostic versions, the capture read cost was mostly `capture_grab_ms`, which pointed to waiting for the backend/device to deliver a frame, not expensive post-retrieve processing.
+- `capture_retrieve_ms` was usually small, but could spike in the main runtime p95. That makes tail latency worth watching in future diagnostic builds even when average retrieve time looks harmless.
+- OpenCV/AVFoundation reported properties are not always enough. Prefer standalone probe `capture_frame_interval_ms` and `effective_fps` over only trusting reported FPS.
 
 ## Probe Interpretation
 
