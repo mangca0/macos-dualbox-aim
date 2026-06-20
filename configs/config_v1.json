@@ -22,7 +22,12 @@
   "pixel_format": "MJPEG",
   "fov_width": 320,
   "fov_height": 320,
-  "target_classes": [1, 3, 0, 2],
+  "target_classes": [
+    1,
+    3,
+    0,
+    2
+  ],
   "class_priority_weights": {
     "1": 1.25,
     "3": 1.25,
@@ -30,15 +35,15 @@
     "2": 0.75
   },
   "detection_confidence_threshold": 0.65,
-  "detection_iou_threshold": 0.3,
+  "detection_iou_threshold": 0.5,
   "target_fps": 240,
   "enable_display": false,
   "debug_mode": false,
   "aim_offset_x": 0.0,
   "aim_offset_y": -0.35,
   "aim_offset_dynamic": true,
-  "pid_kp": 0.37,
-  "pid_ki": 0.0,
-  "pid_kd": 0.0,
-  "pid_kf": 0.0
+  "pid_kp": 0.299,
+  "pid_ki": 0.499,
+  "pid_kd": 0.001,
+  "pid_kf": 0.007
 }
