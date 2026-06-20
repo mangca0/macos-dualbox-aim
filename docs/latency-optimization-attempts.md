@@ -1,5 +1,25 @@
 # Latency Optimization Attempts
 
+## 2026-06-20: V1.2.1 capture load probe release
+
+### Status
+
+Released as an experiment-support version.
+
+### Goal
+
+Explain why standalone capture probe results around 8.3 ms can differ from main runtime `capture_read_ms` around 9.7 ms under CoreML inference load.
+
+### Changes
+
+- Added `--load none|sleep|busy` and `--load-ms` to `scripts/capture_probe.py`.
+- The probe records requested load mode and measured `avg_load_ms`/`p95_load_ms` in JSONL.
+- Markdown output includes load information in the requested mode label.
+
+### Decision
+
+Use `--load sleep --load-ms 9` first to test consumer cadence, then `--load busy --load-ms 9` if CPU scheduling pressure needs a rough local proxy. Keep this outside the main runtime until measurements show a clear next change.
+
 ## 2026-06-20: V1.2.0 capture mode probe release
 
 ### Status

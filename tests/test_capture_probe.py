@@ -84,10 +84,14 @@ class CaptureProbeTests(unittest.TestCase):
             pixel_formats=["MJPEG", "YUY2"],
             fps_values=[120, 240],
             resolutions=[(1280, 720)],
+            load="sleep",
+            load_ms=9.0,
         )
 
         self.assertEqual([mode.pixel_format for mode in modes], ["MJPEG", "MJPEG", "YUY2", "YUY2"])
         self.assertEqual([mode.fps for mode in modes], [120, 240, 120, 240])
+        self.assertEqual([mode.load for mode in modes], ["sleep", "sleep", "sleep", "sleep"])
+        self.assertEqual([mode.load_ms for mode in modes], [9.0, 9.0, 9.0, 9.0])
 
     def test_probe_capture_mode_records_requested_actual_and_stage_timings(self):
         mode = CaptureMode(device=2, width=1280, height=720, fps=120, pixel_format="MJPEG", samples=3)
@@ -109,9 +113,44 @@ class CaptureProbeTests(unittest.TestCase):
         self.assertGreater(result.avg_frame_interval_ms, 0.0)
         json.dumps(result.to_record())
 
+    def test_probe_capture_mode_runs_sleep_load_per_successful_frame(self):
+        slept = []
+        mode = CaptureMode(
+            device=2,
+            width=1280,
+            height=720,
+            fps=120,
+            pixel_format="MJPEG",
+            samples=2,
+            warmup=1,
+            load="sleep",
+            load_ms=9.0,
+        )
+
+        result = probe_capture_mode(
+            mode,
+            capture_factory=FakeCapture,
+            clock=StepClock(),
+            sleeper=lambda seconds: slept.append(seconds),
+        )
+
+        self.assertEqual(slept, [0.009, 0.009, 0.009])
+        self.assertEqual(result.requested["load"], "sleep")
+        self.assertEqual(result.requested["load_ms"], 9.0)
+        self.assertGreater(result.avg_load_ms, 0.0)
+
     def test_probe_outputs_markdown_and_jsonl(self):
         result = probe_capture_mode(
-            CaptureMode(device=0, width=1280, height=720, fps=120, pixel_format="MJPEG", samples=1),
+            CaptureMode(
+                device=0,
+                width=1280,
+                height=720,
+                fps=120,
+                pixel_format="MJPEG",
+                samples=1,
+                load="busy",
+                load_ms=1.0,
+            ),
             capture_factory=FakeCapture,
             clock=StepClock(),
         )
@@ -119,6 +158,7 @@ class CaptureProbeTests(unittest.TestCase):
         markdown = format_results_markdown([result])
         self.assertIn("capture mode probe", markdown.lower())
         self.assertIn("MJPEG", markdown)
+        self.assertIn("busy 1.000ms", markdown)
 
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "probe.jsonl"
@@ -126,6 +166,7 @@ class CaptureProbeTests(unittest.TestCase):
             records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
         self.assertEqual(records[0]["requested"]["pixel_format"], "MJPEG")
+        self.assertEqual(records[0]["requested"]["load"], "busy")
 
 
 if __name__ == "__main__":

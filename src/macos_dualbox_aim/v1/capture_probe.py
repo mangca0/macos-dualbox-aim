@@ -33,6 +33,8 @@ class CaptureMode:
     samples: int = 120
     warmup: int = 10
     backend: Optional[int] = None
+    load: str = "none"
+    load_ms: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -55,6 +57,8 @@ class CaptureProbeResult:
     avg_frame_interval_ms: float
     p95_frame_interval_ms: float
     effective_fps: float
+    avg_load_ms: float
+    p95_load_ms: float
     captured_at: str
 
     def to_record(self) -> Dict[str, Any]:
@@ -78,6 +82,8 @@ class CaptureProbeResult:
             "avg_frame_interval_ms": self.avg_frame_interval_ms,
             "p95_frame_interval_ms": self.p95_frame_interval_ms,
             "effective_fps": self.effective_fps,
+            "avg_load_ms": self.avg_load_ms,
+            "p95_load_ms": self.p95_load_ms,
         }
 
 
@@ -86,11 +92,13 @@ def probe_capture_mode(
     *,
     capture_factory: Callable[..., Any] = cv2.VideoCapture,
     clock: Callable[[], float] = time.perf_counter,
+    sleeper: Callable[[float], None] = time.sleep,
 ) -> CaptureProbeResult:
     if mode.samples <= 0:
         raise ValueError("samples must be positive")
     if mode.warmup < 0:
         raise ValueError("warmup must be non-negative")
+    _validate_load(mode.load, mode.load_ms)
 
     requested = _requested_record(mode)
     open_start = clock()
@@ -107,6 +115,7 @@ def probe_capture_mode(
     retrieve_values: List[float] = []
     read_values: List[float] = []
     interval_values: List[float] = []
+    load_values: List[float] = []
     grab_failures = 0
     retrieve_failures = 0
     successful_frames = 0
@@ -136,8 +145,10 @@ def probe_capture_mode(
                     retrieve_failures += 1
                     continue
 
+                load_ms = _run_load(mode, clock=clock, sleeper=sleeper)
                 successful_frames += 1
                 if successful_frames <= mode.warmup:
+                    load_values.append(load_ms)
                     last_frame_at = retrieve_end
                     continue
                 measured_frames += 1
@@ -149,6 +160,7 @@ def probe_capture_mode(
                 grab_values.append(grab_ms)
                 retrieve_values.append(retrieve_ms)
                 read_values.append(grab_ms + retrieve_ms)
+                load_values.append(load_ms)
     finally:
         capture.release()
 
@@ -177,6 +189,8 @@ def probe_capture_mode(
         avg_frame_interval_ms=_mean(interval_values),
         p95_frame_interval_ms=_percentile(interval_values, 95.0),
         effective_fps=effective_fps,
+        avg_load_ms=_mean(load_values),
+        p95_load_ms=_percentile(load_values, 95.0),
         captured_at=datetime.now(timezone.utc).isoformat(),
     )
 
@@ -190,6 +204,8 @@ def build_modes(
     samples: int = 120,
     warmup: int = 10,
     backend: Optional[int] = None,
+    load: str = "none",
+    load_ms: float = 0.0,
 ) -> List[CaptureMode]:
     modes: List[CaptureMode] = []
     for pixel_format in pixel_formats:
@@ -204,6 +220,8 @@ def build_modes(
                     samples=samples,
                     warmup=warmup,
                     backend=backend,
+                    load=load,
+                    load_ms=load_ms,
                 ))
     return modes
 
@@ -237,6 +255,9 @@ def format_results_markdown(results: Sequence[CaptureProbeResult]) -> str:
             f"{requested['pixel_format']} {requested['width']}x{requested['height']} "
             f"{requested['fps']}fps"
         )
+        load_label = _load_label(str(requested.get("load", "none")), float(requested.get("load_ms", 0.0)))
+        if load_label:
+            requested_label = f"{requested_label} / {load_label}"
         actual_label = (
             f"{actual.get('fourcc') or '--'} {actual.get('width', 0):.0f}x"
             f"{actual.get('height', 0):.0f} {actual.get('fps', 0):.1f}fps"
@@ -269,6 +290,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--samples", type=int, default=120)
     parser.add_argument("--warmup", type=int, default=10)
     parser.add_argument("--backend", choices=("auto", "avfoundation"), default="auto")
+    parser.add_argument("--load", choices=("none", "sleep", "busy"), default="none")
+    parser.add_argument("--load-ms", type=float, default=0.0)
     parser.add_argument("--out-jsonl", default=None)
     parser.add_argument("--out-md", default=None)
     return parser
@@ -286,6 +309,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             samples=args.samples,
             warmup=args.warmup,
             backend=backend,
+            load=args.load,
+            load_ms=args.load_ms,
         )
         results = [probe_capture_mode(mode) for mode in modes]
         report = format_results_markdown(results)
@@ -328,6 +353,8 @@ def _requested_record(mode: CaptureMode) -> Dict[str, Any]:
         "backend": mode.backend,
         "samples": mode.samples,
         "warmup": mode.warmup,
+        "load": mode.load,
+        "load_ms": mode.load_ms,
     }
 
 
@@ -352,6 +379,41 @@ def _parse_backend(value: str) -> Optional[int]:
     if value == "avfoundation":
         return int(cv2.CAP_AVFOUNDATION)
     raise ValueError(f"Unsupported backend: {value}")
+
+
+def _validate_load(load: str, load_ms: float):
+    if load not in {"none", "sleep", "busy"}:
+        raise ValueError("load must be one of none, sleep, busy")
+    if load_ms < 0.0:
+        raise ValueError("load-ms must be non-negative")
+    if load == "none" and load_ms > 0.0:
+        raise ValueError("load-ms requires --load sleep or --load busy")
+
+
+def _run_load(
+    mode: CaptureMode,
+    *,
+    clock: Callable[[], float],
+    sleeper: Callable[[float], None],
+) -> float:
+    if mode.load == "none" or mode.load_ms <= 0.0:
+        return 0.0
+    target_s = mode.load_ms / 1000.0
+    start = clock()
+    if mode.load == "sleep":
+        sleeper(target_s)
+    elif mode.load == "busy":
+        while clock() - start < target_s:
+            pass
+    else:
+        raise ValueError("load must be one of none, sleep, busy")
+    return max(0.0, (clock() - start) * 1000.0)
+
+
+def _load_label(load: str, load_ms: float) -> str:
+    if load == "none" or load_ms <= 0.0:
+        return ""
+    return f"{load} {_fmt(load_ms)}ms"
 
 
 def _parse_csv(value: str) -> List[str]:

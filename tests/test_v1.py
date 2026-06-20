@@ -203,7 +203,7 @@ class V1Tests(unittest.TestCase):
         data = json.loads(path.read_text(encoding="utf-8"))
 
         self.assertEqual(data["_version"], AIMBOT_V1_VERSION)
-        self.assertIn("V1.2.0", data["_comment"])
+        self.assertIn("V1.2.1", data["_comment"])
         self.assertEqual(data["_custom_note"], "keep me")
         self.assertNotIn("frame_queue_size", data)
 
@@ -332,7 +332,7 @@ class V1Tests(unittest.TestCase):
     def test_web_tuner_snapshot_exposes_runtime_version(self):
         v1_1 = WebTuner(AimbotConfigV1(), self._write_temp_config({})).snapshot()
 
-        self.assertEqual(v1_1["runtime"]["version"], "1.2.0")
+        self.assertEqual(v1_1["runtime"]["version"], "1.2.1")
         self.assertIn("v1.config", v1_1["runtime"]["config_class"])
 
     def test_web_tuner_limits_trigger_buttons_to_requested_mouse_inputs(self):
