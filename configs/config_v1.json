@@ -1,6 +1,6 @@
 {
-  "_comment": "macos-dualbox-aim V1.1.0 - V1.0 runtime behavior with latency analysis tooling",
-  "_version": "1.1.0",
+  "_comment": "macos-dualbox-aim V1.1.1 - V1.0 runtime behavior with capture diagnostics",
+  "_version": "1.1.1",
   "_description": "capture -> CoreML detections -> screen-center bbox error -> aim offset -> PIDF -> KMBox",
   "model_path": "models/cs2.mlpackage",
   "capture_device": 0,

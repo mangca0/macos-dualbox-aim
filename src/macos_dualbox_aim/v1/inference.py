@@ -2,6 +2,7 @@ import logging
 import queue
 import threading
 import time
+from copy import deepcopy
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +32,9 @@ class Frame:
     timestamp: float
     captured_at: float
     capture_ms: float
+    capture_grab_ms: float
+    capture_retrieve_ms: float
+    capture_frame_interval_ms: float
     crop_ms: float
     image: np.ndarray
 
@@ -301,6 +305,10 @@ class RealtimeInference:
         self.frames_dropped = 0
         self.frame_queue_replaced = 0
         self.frame_queue_drained = 0
+        self.capture_grab_failures = 0
+        self.capture_retrieve_failures = 0
+        self.capture_diagnostics = self._initial_capture_diagnostics()
+        self._last_capture_frame_at: Optional[float] = None
         self.actual_inference_fps = 0.0
         self.on_detection: Optional[Callable[[DetectionResult], None]] = None
         self.logger = logging.getLogger(__name__)
@@ -333,13 +341,19 @@ class RealtimeInference:
             self.stop()
 
     def _capture_loop(self):
+        open_start = time.perf_counter()
         capture = cv2.VideoCapture(self.capture_device)
+        open_ms = (time.perf_counter() - open_start) * 1000.0
+
+        configure_start = time.perf_counter()
         fourcc = cv2.VideoWriter_fourcc(*self._fourcc_code(self.pixel_format))
         capture.set(cv2.CAP_PROP_FOURCC, fourcc)
         capture.set(cv2.CAP_PROP_FPS, self.target_fps)
         capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         capture.set(cv2.CAP_PROP_FRAME_WIDTH, self.capture_resolution[0])
         capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self.capture_resolution[1])
+        configure_ms = (time.perf_counter() - configure_start) * 1000.0
+        self._update_capture_diagnostics(capture, open_ms=open_ms, configure_ms=configure_ms)
 
         if not capture.isOpened():
             self.logger.error("Failed to open capture device %s", self.capture_device)
@@ -347,11 +361,27 @@ class RealtimeInference:
             return
 
         while self.running:
-            capture_start = time.perf_counter()
-            ok, frame = capture.read()
-            capture_ms = (time.perf_counter() - capture_start) * 1000.0
-            if not ok:
+            grab_start = time.perf_counter()
+            grabbed = capture.grab()
+            grab_end = time.perf_counter()
+            grab_ms = (grab_end - grab_start) * 1000.0
+            if not grabbed:
+                self._increment_counter("capture_grab_failures")
                 continue
+
+            retrieve_start = time.perf_counter()
+            retrieved, frame = capture.retrieve()
+            retrieve_end = time.perf_counter()
+            retrieve_ms = (retrieve_end - retrieve_start) * 1000.0
+            if not retrieved:
+                self._increment_counter("capture_retrieve_failures")
+                continue
+            if self._last_capture_frame_at is None:
+                frame_interval_ms = 0.0
+            else:
+                frame_interval_ms = max(0.0, (retrieve_end - self._last_capture_frame_at) * 1000.0)
+            self._last_capture_frame_at = retrieve_end
+
             self.frame_id += 1
             self._increment_counter("frames_captured")
             crop_start = time.perf_counter()
@@ -361,7 +391,17 @@ class RealtimeInference:
             crop_ms = (time.perf_counter() - crop_start) * 1000.0
             replaced = self._put_latest(
                 self.frame_queue,
-                Frame(self.frame_id, time.time(), time.perf_counter(), capture_ms, crop_ms, frame),
+                Frame(
+                    self.frame_id,
+                    time.time(),
+                    time.perf_counter(),
+                    grab_ms + retrieve_ms,
+                    grab_ms,
+                    retrieve_ms,
+                    frame_interval_ms,
+                    crop_ms,
+                    frame,
+                ),
             )
             if replaced:
                 self._increment_counter("frame_queue_replaced")
@@ -397,6 +437,9 @@ class RealtimeInference:
 
             latency_ms = {
                 "capture_read_ms": frame.capture_ms,
+                "capture_grab_ms": getattr(frame, "capture_grab_ms", 0.0),
+                "capture_retrieve_ms": getattr(frame, "capture_retrieve_ms", 0.0),
+                "capture_frame_interval_ms": getattr(frame, "capture_frame_interval_ms", 0.0),
                 "crop_ms": frame.crop_ms,
                 "queue_wait_ms": queue_ms,
                 **model_timings,
@@ -453,6 +496,7 @@ class RealtimeInference:
                 "p95": {},
                 "max": {},
                 "counters": counters,
+                "capture": self._capture_diagnostics_snapshot(),
             }
 
         keys = [key for key in samples[-1] if key != "frame_id"]
@@ -465,6 +509,7 @@ class RealtimeInference:
             "p95": {key: self._percentile([sample[key] for sample in samples], 95.0) for key in keys},
             "max": {key: max(sample[key] for sample in samples) for key in keys},
             "counters": counters,
+            "capture": self._capture_diagnostics_snapshot(),
         }
 
     def _record_latency(self, frame_id: int, latency_ms: Dict[str, float]):
@@ -484,7 +529,54 @@ class RealtimeInference:
             "frames_dropped": self.frames_dropped,
             "frame_queue_replaced": self.frame_queue_replaced,
             "frame_queue_drained": self.frame_queue_drained,
+            "capture_grab_failures": self.capture_grab_failures,
+            "capture_retrieve_failures": self.capture_retrieve_failures,
         }
+
+    def _initial_capture_diagnostics(self) -> Dict[str, object]:
+        return {
+            "backend": "",
+            "open_ms": 0.0,
+            "configure_ms": 0.0,
+            "requested": {
+                "device": self.capture_device,
+                "width": self.capture_resolution[0],
+                "height": self.capture_resolution[1],
+                "fps": self.target_fps,
+                "pixel_format": self.pixel_format,
+                "fourcc": self._fourcc_code(self.pixel_format),
+                "buffersize": 1,
+            },
+            "actual": {
+                "width": 0.0,
+                "height": 0.0,
+                "fps": 0.0,
+                "fourcc": "",
+                "buffersize": 0.0,
+            },
+        }
+
+    def _update_capture_diagnostics(self, capture, *, open_ms: float, configure_ms: float):
+        diagnostics = self._initial_capture_diagnostics()
+        diagnostics["open_ms"] = float(open_ms)
+        diagnostics["configure_ms"] = float(configure_ms)
+        try:
+            diagnostics["backend"] = str(capture.getBackendName())
+        except Exception:
+            diagnostics["backend"] = ""
+        diagnostics["actual"] = {
+            "width": float(capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
+            "height": float(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+            "fps": float(capture.get(cv2.CAP_PROP_FPS)),
+            "fourcc": self._fourcc_to_string(capture.get(cv2.CAP_PROP_FOURCC)),
+            "buffersize": float(capture.get(cv2.CAP_PROP_BUFFERSIZE)),
+        }
+        with self.latency_lock:
+            self.capture_diagnostics = diagnostics
+
+    def _capture_diagnostics_snapshot(self) -> Dict[str, object]:
+        with self.latency_lock:
+            return deepcopy(self.capture_diagnostics)
 
     def _percentile(self, values: List[float], percentile: float) -> float:
         if not values:
@@ -529,3 +621,15 @@ class RealtimeInference:
             "UYVY": "UYVY",
         }
         return mapping.get(pixel_format, "MJPG")
+
+    def _fourcc_to_string(self, value: float) -> str:
+        try:
+            code = int(value)
+        except (TypeError, ValueError, OverflowError):
+            return ""
+        chars = []
+        for shift in (0, 8, 16, 24):
+            byte = (code >> shift) & 0xFF
+            if byte:
+                chars.append(chr(byte))
+        return "".join(chars)

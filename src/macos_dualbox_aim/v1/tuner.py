@@ -468,6 +468,9 @@ _HTML = """<!doctype html>
         <span>Dropped <strong id="frames-dropped">0</strong></span>
         <span>Replaced <strong id="frames-replaced">0</strong></span>
         <span>Drained <strong id="frames-drained">0</strong></span>
+        <span>Grab fail <strong id="capture-grab-failures">0</strong></span>
+        <span>Retrieve fail <strong id="capture-retrieve-failures">0</strong></span>
+        <span>Capture <strong id="capture-actual">--</strong></span>
       </div>
       <div id="latency-highlights" class="highlight-grid"></div>
       <div class="metric-head"><span>Stage</span><span>Now</span><span>Avg</span><span>P95</span><span>Max</span></div>
@@ -507,6 +510,9 @@ _HTML = """<!doctype html>
       ["read_included_total_ms", "Read-included total"],
       ["program_total_ms", "Program total"],
       ["capture_read_ms", "Capture read"],
+      ["capture_grab_ms", "Capture grab"],
+      ["capture_retrieve_ms", "Capture retrieve"],
+      ["capture_frame_interval_ms", "Frame interval"],
       ["crop_ms", "Crop"],
       ["queue_wait_ms", "Queue wait"],
       ["preprocess_ms", "Preprocess"],
@@ -521,6 +527,7 @@ _HTML = """<!doctype html>
     const highlightOrder = [
       ["program_total_ms", "Program total"],
       ["queue_wait_ms", "Queue wait"],
+      ["capture_read_ms", "Capture read"],
       ["inference_ms", "Inference"],
       ["coreml_ms", "CoreML"],
       ["dropped", "Dropped"],
@@ -630,6 +637,9 @@ _HTML = """<!doctype html>
       document.querySelector("#frames-dropped").textContent = String(counters.frames_dropped || 0);
       document.querySelector("#frames-replaced").textContent = String(counters.frame_queue_replaced || 0);
       document.querySelector("#frames-drained").textContent = String(counters.frame_queue_drained || 0);
+      document.querySelector("#capture-grab-failures").textContent = String(counters.capture_grab_failures || 0);
+      document.querySelector("#capture-retrieve-failures").textContent = String(counters.capture_retrieve_failures || 0);
+      renderCaptureSummary(latency.capture || {});
       renderHighlights(latency, counters);
       const rows = document.querySelector("#latency-rows");
       rows.innerHTML = "";
@@ -643,6 +653,17 @@ _HTML = """<!doctype html>
         row.innerHTML = `<span><strong>${label}</strong></span><span>${formatMs(current[key])}</span><span>${formatMs(avg[key])}</span><span>${formatMs(p95[key])}</span><span>${formatMs(max[key])}</span>`;
         rows.appendChild(row);
       }
+    }
+
+    function renderCaptureSummary(capture) {
+      const actual = capture.actual || {};
+      const requested = capture.requested || {};
+      const backend = capture.backend || "--";
+      const width = Number.isFinite(actual.width) ? actual.width.toFixed(0) : "--";
+      const height = Number.isFinite(actual.height) ? actual.height.toFixed(0) : "--";
+      const fps = Number.isFinite(actual.fps) ? actual.fps.toFixed(1) : "--";
+      const fourcc = actual.fourcc || requested.fourcc || "--";
+      document.querySelector("#capture-actual").textContent = `${backend} ${width}x${height} ${fps}fps ${fourcc}`;
     }
 
     function renderHighlights(latency, counters) {

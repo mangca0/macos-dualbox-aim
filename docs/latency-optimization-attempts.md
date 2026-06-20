@@ -1,5 +1,27 @@
 # Latency Optimization Attempts
 
+## 2026-06-20: V1.1.1 capture diagnostics release
+
+### Status
+
+Released as an observation-only version.
+
+### Goal
+
+Improve the latency monitor before the next optimization attempt, focused on the capture path because `capture_read_ms` is one of the two dominant contributors to total latency.
+
+### Changes
+
+- Split OpenCV capture timing into `capture_grab_ms` and `capture_retrieve_ms`.
+- Added `capture_frame_interval_ms` to show the effective frame cadence delivered by the capture backend.
+- Added capture backend and actual device property reporting: resolution, FPS, FourCC, and buffer size.
+- Added `capture_grab_failures` and `capture_retrieve_failures` counters.
+- Exposed the new capture diagnostics through tuner `/api/config`, the Web tuner latency panel, and `scripts/latency_tool.py` comparisons.
+
+### Decision
+
+Do not change queueing, model inference, target selection, or control behavior in V1.1.1. Use this version to collect cleaner data for capture backend/device-mode experiments.
+
 ## 2026-06-20: V1.1.0 micro-optimization attempt
 
 ### Status

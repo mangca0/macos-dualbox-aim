@@ -1,6 +1,6 @@
-# macos-dualbox-aim V1.1.0
+# macos-dualbox-aim V1.1.1
 
-V1.1.0 是基于 V1.0.0 独立出来的延迟分析工具版本，只保留：
+V1.1.1 是基于 V1.0.0 行为链路的延迟观测版本，只保留：
 
 - 配置加载
 - 实时 CoreML 推理入口
@@ -10,10 +10,17 @@ V1.1.0 是基于 V1.0.0 独立出来的延迟分析工具版本，只保留：
 - KMBox 热键监控与相对鼠标移动
 - Web tuner 实时调参与保存配置
 
-## V1.1.0 延迟分析
+## V1.1.1 延迟分析
 
-V1.1.0 保留 V1.0.0 的运行链路行为，并新增 tuner 延迟采集、对比报告和 runtime 版本防误标能力。
-已验证的一轮微优化没有带来实际可感知的平均延迟改善，记录见
+V1.1.1 保留 V1.0.0 的运行链路行为，并在 V1.1.0 的 tuner 延迟采集、对比报告和 runtime 版本防误标能力上，新增采集链路细分诊断：
+
+- `capture_grab_ms`
+- `capture_retrieve_ms`
+- `capture_frame_interval_ms`
+- 采集后端、实际分辨率/FPS/FourCC/缓冲设置
+- `capture_grab_failures`、`capture_retrieve_failures`
+
+V1.1.0 已验证的一轮微优化没有带来实际可感知的平均延迟改善，记录见
 `docs/latency-optimization-attempts.md`。
 
 ## 常用命令
@@ -36,10 +43,10 @@ uv run python -m unittest discover -s tests
 uv run python scripts/main_v1.py
 
 for i in 1 2 3 4 5; do
-  uv run python scripts/latency_tool.py capture --label v1.1.0 --run run$i --duration 60 --interval 0.5
+  uv run python scripts/latency_tool.py capture --label v1.1.1 --run run$i --duration 60 --interval 0.5
 done
 
-uv run python scripts/latency_tool.py compare "latency_runs/*.jsonl" --baseline-label v1.0.0 --candidate-label v1.1.0 --out latency_runs/v1.0.0_vs_v1.1.0.md
+uv run python scripts/latency_tool.py compare "latency_runs/*.jsonl" --baseline-label v1.0.0 --candidate-label v1.1.1 --out latency_runs/v1.0.0_vs_v1.1.1.md
 ```
 
 对比报告里的主平均值使用 tuner 返回的 `latency.avg`，也就是每次抓到的 tuner 滚动平均值再做 run 间汇总；负数 delta/change 表示 candidate 更快。
