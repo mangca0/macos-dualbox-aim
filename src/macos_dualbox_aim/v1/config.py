@@ -17,7 +17,6 @@ INT_FIELDS = {
     "fov_width",
     "fov_height",
     "target_fps",
-    "frame_queue_size",
 }
 FLOAT_FIELDS = {
     "detection_confidence_threshold",
@@ -79,7 +78,6 @@ class AimbotConfigV1:
     detection_confidence_threshold: float = 0.65
     detection_iou_threshold: float = 0.3
     target_fps: int = 240
-    frame_queue_size: int = 3
     enable_display: bool = False
     debug_mode: bool = False
 
@@ -128,7 +126,7 @@ class AimbotConfigV1:
             raise ValueError("monitor_port must be between 1024 and 49151")
         if not 1024 <= self.tuner_port <= 65535:
             raise ValueError("tuner_port must be between 1024 and 65535")
-        for name in ("screen_width", "screen_height", "fov_width", "fov_height", "target_fps", "frame_queue_size"):
+        for name in ("screen_width", "screen_height", "fov_width", "fov_height", "target_fps"):
             if getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be positive")
         if self.fov_width > self.screen_width or self.fov_height > self.screen_height:
@@ -158,7 +156,7 @@ class AimbotConfigV1:
 
     def to_json(self, path: str | Path):
         data: Dict[str, Any] = {
-            "_comment": "Aimbot V1 - minimal PIDF runtime",
+            "_comment": "macos-dualbox-aim V1 - minimal PIDF runtime",
             "_version": "1.0.0",
             "_description": "capture -> CoreML detections -> screen-center bbox error -> aim offset -> PIDF -> KMBox",
         }

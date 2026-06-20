@@ -1,4 +1,4 @@
-# PyTorch2CoreML Agent Notes
+# macos-dualbox-aim Agent Notes
 
 > 控制在 8KB 内。只记录代码里不容易稳定推断、且协作中真实踩过或很容易踩到的坑。
 
@@ -6,7 +6,7 @@
 
 ## 项目定位
 
-aimbot 运行在 macOS 算力机上，通过采集卡接收游戏机画面，用 CoreML/YOLO 做实时目标检测，再经由 KMBox Net 向游戏机发送硬件鼠标输入。
+macos-dualbox-aim 运行在 macOS 算力机上，通过采集卡接收游戏机画面，用 CoreML/YOLO 做实时目标检测，再经由 KMBox Net 向游戏机发送硬件鼠标输入。
 
 - 游戏机只运行游戏并接收鼠标输入。
 - 算力机负责采集、推理、目标选择、控制算法和 KMBox 通信。
@@ -15,7 +15,17 @@ aimbot 运行在 macOS 算力机上，通过采集卡接收游戏机画面，用
 ## 当前主线
 
 - `scripts/main_v1.py` 是当前 V1 主入口。
-- `src/aimbot/__init__.py` 可能落后于实验分支；新增 V1 能力时同步检查导出。
+- `src/macos_dualbox_aim/__init__.py` 可能落后于实验分支；新增 V1 能力时同步检查导出。
+
+## 版本边界
+
+- `scripts/main_v1.py` 永远只 import `macos_dualbox_aim.v1.*`。
+- `scripts/main_v2.py` 永远只 import `macos_dualbox_aim.v2.*`。
+- 包根目录不放 `config.py`、`controller.py` 这类行为模块或兼容壳。
+- `macos_dualbox_aim.core.*` 只放稳定通用能力。
+- 任何会影响行为的实验，先放到当前 major 目录里。
+- 只有经过多个版本都确认稳定的东西，才上移到 `core/`。
+- 每次发布可用版本打 tag，例如 `v1.1.0-stable` 或 `v1.1.0`。
 
 ## 关键约定
 

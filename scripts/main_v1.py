@@ -4,11 +4,11 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from aimbot.v1 import AimbotConfigV1, AimbotV1, HotkeyConfig, HotkeyMonitor, RealtimeInference, WebTuner
+from macos_dualbox_aim.v1 import AimbotConfigV1, AimbotV1, HotkeyConfig, HotkeyMonitor, RealtimeInference, WebTuner
 
 
 def main():
-    config_path = project_root / "configs" / "aimbot_config_v1.json"
+    config_path = project_root / "configs" / "config_v1.json"
     try:
         if config_path.exists():
             config = AimbotConfigV1.from_json(config_path)
@@ -59,7 +59,6 @@ def main():
         crop_size=(config.fov_width, config.fov_height),
         capture_resolution=(config.screen_width, config.screen_height),
         pixel_format=config.pixel_format,
-        frame_queue_size=config.frame_queue_size,
     )
 
     frame_shape = (config.fov_height, config.fov_width)

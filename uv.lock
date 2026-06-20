@@ -3,25 +3,6 @@ revision = 3
 requires-python = ">=3.11"
 
 [[package]]
-name = "aimbot"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "coremltools" },
-    { name = "numpy" },
-    { name = "opencv-python" },
-    { name = "pillow" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "coremltools", specifier = ">=9.0" },
-    { name = "numpy", specifier = ">=2.0" },
-    { name = "opencv-python", specifier = ">=4.10" },
-    { name = "pillow", specifier = ">=10.0" },
-]
-
-[[package]]
 name = "attrs"
 version = "26.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -77,6 +58,25 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/57/4c/925ad6d76ad5bb92c9dc64798dc13651050687a03b00c03abd216dfb3732/coremltools-9.0-cp313-none-macosx_10_15_x86_64.whl", hash = "sha256:c3965805df319d5f2755d0adfb8e28312db655be09be87bd00fad097b104be57", size = 2792787, upload-time = "2025-11-10T21:49:06.106Z" },
     { url = "https://files.pythonhosted.org/packages/62/50/76d5a828d875ed8ad7392bf9294233261747de02f7415f51d4add8dc0acf/coremltools-9.0-cp313-none-macosx_11_0_arm64.whl", hash = "sha256:9f2f858beec7f5d486cd1a59aefb452d59347e236670b67db325795bf692f480", size = 2764608, upload-time = "2025-11-10T21:49:21.195Z" },
     { url = "https://files.pythonhosted.org/packages/a7/9f/0e8ba95ae1a1f2c9a6460c7f95a722a28a3eeaa47aef9266ef454d2e3b8b/coremltools-9.0-cp313-none-manylinux1_x86_64.whl", hash = "sha256:0af02216767232ece83bc4ec5035d7bba3c53c27de11be1a32e8461b4025d866", size = 2308338, upload-time = "2025-11-10T21:49:36.009Z" },
+]
+
+[[package]]
+name = "macos-dualbox-aim"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "coremltools" },
+    { name = "numpy" },
+    { name = "opencv-python" },
+    { name = "pillow" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "coremltools", specifier = ">=9.0" },
+    { name = "numpy", specifier = ">=2.0" },
+    { name = "opencv-python", specifier = ">=4.10" },
+    { name = "pillow", specifier = ">=10.0" },
 ]
 
 [[package]]

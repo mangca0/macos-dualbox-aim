@@ -5,11 +5,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from aimbot.config import AimbotConfigV1
-from aimbot.controller import AimbotV1, PIDFControllerV1
-from aimbot.hotkey import HotkeyConfig
-from aimbot.kmbox import ERR_NET_RX_TIMEOUT, KmboxConfig, KmboxNet, SUCCESS
-from aimbot.tuner import WebTuner
+from macos_dualbox_aim.v1.config import AimbotConfigV1
+from macos_dualbox_aim.v1.controller import AimbotV1, PIDFControllerV1
+from macos_dualbox_aim.v1.hotkey import HotkeyConfig
+from macos_dualbox_aim.v1.kmbox import ERR_NET_RX_TIMEOUT, KmboxConfig, KmboxNet, SUCCESS
+from macos_dualbox_aim.v1.tuner import WebTuner
 
 
 class FakeKmbox:
@@ -117,7 +117,7 @@ class V1Tests(unittest.TestCase):
         self.assertIn("kmbox_send_ack_ms", timing_ms)
 
     def test_config_exposes_only_pidf_control_parameters(self):
-        config_path = Path(__file__).resolve().parent.parent / "configs" / "aimbot_config_v1.json"
+        config_path = Path(__file__).resolve().parent.parent / "configs" / "config_v1.json"
         data = json.loads(config_path.read_text(encoding="utf-8"))
 
         self.assertEqual({"pid_kp", "pid_ki", "pid_kd", "pid_kf"} & set(data), {
@@ -162,31 +162,29 @@ class V1Tests(unittest.TestCase):
 
         self.assertEqual(config.class_priority_weights, {1: 1.5})
 
-    def test_config_accepts_frame_queue_size(self):
+    def test_config_rejects_frame_queue_size(self):
         path = self._write_temp_config({"frame_queue_size": 1})
 
-        config = AimbotConfigV1.from_json(path)
+        with self.assertRaisesRegex(ValueError, "Unknown config field: frame_queue_size"):
+            AimbotConfigV1.from_json(path)
 
-        self.assertEqual(config.frame_queue_size, 1)
+    def test_v1_config_does_not_expose_frame_queue_size(self):
+        config_path = Path(__file__).resolve().parent.parent / "configs" / "config_v1.json"
 
-    def test_v1_0_1_config_uses_single_frame_queue(self):
-        config_path = Path(__file__).resolve().parent.parent / "configs" / "aimbot_config_v1_0_1.json"
-
-        config = AimbotConfigV1.from_json(config_path)
         data = json.loads(config_path.read_text(encoding="utf-8"))
 
-        self.assertEqual(data["_version"], "1.0.1")
-        self.assertEqual(config.frame_queue_size, 1)
+        self.assertEqual(data["_version"], "1.0.0")
+        self.assertNotIn("frame_queue_size", data)
 
     def test_config_save_preserves_version_metadata(self):
-        path = self._write_temp_config({"_version": "1.0.1", "frame_queue_size": 1})
+        path = self._write_temp_config({"_version": "1.0.0"})
         config = AimbotConfigV1.from_json(path)
 
         config.to_json(path)
         data = json.loads(path.read_text(encoding="utf-8"))
 
-        self.assertEqual(data["_version"], "1.0.1")
-        self.assertEqual(data["frame_queue_size"], 1)
+        self.assertEqual(data["_version"], "1.0.0")
+        self.assertNotIn("frame_queue_size", data)
 
     def test_web_tuner_applies_live_fields_and_saves_config(self):
         config = AimbotConfigV1()
@@ -240,7 +238,7 @@ class V1Tests(unittest.TestCase):
             return sock
 
         kmbox = KmboxNet(KmboxConfig(connect_attempts=2, socket_timeout=0.01))
-        with patch("aimbot.kmbox.socket.socket", side_effect=make_socket):
+        with patch("macos_dualbox_aim.v1.kmbox.socket.socket", side_effect=make_socket):
             result = kmbox.init()
 
         self.assertEqual(result, ERR_NET_RX_TIMEOUT)

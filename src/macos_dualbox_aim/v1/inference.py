@@ -473,9 +473,9 @@ class RealtimeInference:
         with self.latency_lock:
             self.latency_samples.append(sample)
 
-    def _increment_counter(self, name: str):
+    def _increment_counter(self, name: str, amount: int = 1):
         with self.latency_lock:
-            setattr(self, name, int(getattr(self, name)) + 1)
+            setattr(self, name, int(getattr(self, name)) + int(amount))
 
     def _counter_snapshot_locked(self) -> Dict[str, int]:
         return {

@@ -1,7 +1,7 @@
 [project]
-name = "aimbot"
+name = "macos-dualbox-aim"
 version = "0.1.0"
-description = "Minimal V1 PIDF aimbot runtime"
+description = "Minimal V1 PIDF aim runtime for macOS dual-box setup"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -16,4 +16,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/aimbot"]
+packages = ["src/macos_dualbox_aim"]

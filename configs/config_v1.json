@@ -1,5 +1,5 @@
 {
-  "_comment": "Aimbot V1 - minimal PIDF runtime",
+  "_comment": "macos-dualbox-aim V1 - minimal PIDF runtime",
   "_version": "1.0.0",
   "_description": "capture -> CoreML detections -> screen-center bbox error -> aim offset -> PIDF -> KMBox",
   "model_path": "models/cs2.mlpackage",
@@ -32,7 +32,6 @@
   "detection_confidence_threshold": 0.65,
   "detection_iou_threshold": 0.3,
   "target_fps": 240,
-  "frame_queue_size": 3,
   "enable_display": false,
   "debug_mode": false,
   "aim_offset_x": 0.0,
