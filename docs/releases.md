@@ -2,6 +2,14 @@
 
 Concise V1 release notes. Detailed experiment rationale lives in `docs/latency-optimization-attempts.md`; stable conclusions live in `docs/latency-findings.md`.
 
+## v1.2.2
+
+- Added `--load-placement inline|thread` to `scripts/capture_probe.py`.
+- `inline` preserves V1.2.1 serial capture-then-load behavior.
+- `thread` runs load simulation in a background thread while the main thread keeps capturing.
+- Markdown and JSONL output now include load iterations and actual load period stats.
+- No main runtime behavior change.
+
 ## v1.2.1
 
 - Added capture probe load simulation: `--load none|sleep|busy` and `--load-ms`.

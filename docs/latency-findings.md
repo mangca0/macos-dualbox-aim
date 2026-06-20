@@ -20,12 +20,13 @@ This file records stable conclusions from V1 latency experiments. Raw captures a
 
 - V1.2.0 standalone capture probe showed roughly 8.3 ms frame intervals for 1080p120 capture.
 - V1.2.1 inline load probe is intentionally serial: it runs capture, then load, then captures again. It proves that serial capture plus 9 ms work drops effective cadence to about 60fps, but it does not model the threaded main runtime.
+- V1.2.2 adds a threaded load probe so capture can run continuously while `sleep` or `busy` load is generated in the same process. Use this before making any main runtime scheduling change.
 - A lower `avg_grab_ms` under inline load does not mean capture got faster. It can mean the next frame was already waiting in the backend buffer after the artificial load.
-- To test main-runtime-like contention, the next useful probe should run capture and load concurrently in separate threads.
+- Threaded load probe interpretation should compare no-load, `sleep9 thread`, and `busy9 thread` against the main runtime `capture_frame_interval_ms`/`capture_read_ms`.
 
 ## Direction
 
 - Do not spend more time on color format switching unless a new device/backend shows different measured behavior.
-- Next capture-side experiment: threaded load probe to compare no-load, sleep-load, and busy-load while capture runs continuously.
+- Next capture-side experiment: run the V1.2.2 threaded load probe to compare no-load, sleep-load, and busy-load while capture runs continuously.
 - If threaded load does not reproduce the main runtime capture degradation, shift attention to CoreML runtime/model optimization.
 - If threaded load reproduces the degradation, investigate thread scheduling, capture/inference handoff, and queue freshness rather than postprocess or controller micro-optimizations.

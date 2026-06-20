@@ -1,5 +1,29 @@
 # Latency Optimization Attempts
 
+## 2026-06-20: V1.2.2 threaded capture load probe release
+
+### Status
+
+Released as an experiment-support version.
+
+### Goal
+
+Separate two possible explanations for the main runtime capture slowdown:
+
+- Serial consumer cadence after capture makes the next frame wait.
+- Concurrent same-process load affects AVFoundation/OpenCV capture timing through CPU/GIL/runtime scheduling pressure.
+
+### Changes
+
+- Added `--load-placement inline|thread` to `scripts/capture_probe.py`.
+- `inline` keeps the V1.2.1 capture-then-load behavior for comparison.
+- `thread` starts a background load worker while the main thread keeps capturing.
+- Markdown and JSONL output include load iterations plus average load duration and average load period; JSONL also records p95 load duration and p95 load period.
+
+### Decision
+
+Run the V1.2.2 `thread` probe before changing the main runtime. If `busy9 thread` keeps `avg_frame_interval_ms` near the standalone 8.3 ms baseline, deprioritize simple CPU/GIL contention and look at CoreML/AVFoundation/runtime interaction. If it degrades toward the main runtime 9.7-10 ms capture interval, investigate thread scheduling and capture/inference handoff before touching postprocess or controller code.
+
 ## 2026-06-20: V1.2.1 capture load probe release
 
 ### Status

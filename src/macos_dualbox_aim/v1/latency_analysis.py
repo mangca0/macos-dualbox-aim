@@ -313,7 +313,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     capture = subparsers.add_parser("capture", help="Capture tuner latency snapshots into JSONL.")
-    capture.add_argument("--label", required=True, help="Version label, for example v1.0.0 or v1.2.1.")
+    capture.add_argument("--label", required=True, help="Version label, for example v1.0.0 or v1.2.2.")
     capture.add_argument("--run", default=None, help="Run id. Defaults to run timestamp.")
     capture.add_argument("--duration", type=float, default=60.0, help="Capture duration in seconds.")
     capture.add_argument("--interval", type=float, default=0.5, help="Polling interval in seconds.")
@@ -324,7 +324,7 @@ def build_parser() -> argparse.ArgumentParser:
     compare = subparsers.add_parser("compare", help="Compare captured JSONL files.")
     compare.add_argument("inputs", nargs="+", help="JSONL files or glob patterns.")
     compare.add_argument("--baseline-label", default="v1.0.0")
-    compare.add_argument("--candidate-label", default="v1.2.1")
+    compare.add_argument("--candidate-label", default="v1.2.2")
     compare.add_argument("--metrics", default=",".join(DEFAULT_METRICS), help="Comma-separated metric list.")
     compare.add_argument("--out", default=None, help="Optional markdown report path.")
     return parser
