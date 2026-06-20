@@ -1,3 +1,4 @@
+import inspect
 import json
 import socket
 import tempfile
@@ -5,9 +6,12 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from macos_dualbox_aim.v1.config import AimbotConfigV1
+import numpy as np
+
+from macos_dualbox_aim.v1.config import AIMBOT_V1_VERSION, AimbotConfigV1
 from macos_dualbox_aim.v1.controller import AimbotV1, PIDFControllerV1
 from macos_dualbox_aim.v1.hotkey import HotkeyConfig
+from macos_dualbox_aim.v1.inference import CoreMLDetector, RealtimeInference
 from macos_dualbox_aim.v1.kmbox import ERR_NET_RX_TIMEOUT, KmboxConfig, KmboxNet, SUCCESS
 from macos_dualbox_aim.v1.tuner import WebTuner
 
@@ -173,18 +177,56 @@ class V1Tests(unittest.TestCase):
 
         data = json.loads(config_path.read_text(encoding="utf-8"))
 
-        self.assertEqual(data["_version"], "1.0.0")
+        self.assertEqual(data["_version"], AIMBOT_V1_VERSION)
         self.assertNotIn("frame_queue_size", data)
 
-    def test_config_save_preserves_version_metadata(self):
-        path = self._write_temp_config({"_version": "1.0.0"})
+    def test_config_save_writes_current_version_metadata(self):
+        path = self._write_temp_config({
+            "_comment": "macos-dualbox-aim V1 - minimal PIDF runtime",
+            "_version": "1.0.0",
+            "_custom_note": "keep me",
+        })
         config = AimbotConfigV1.from_json(path)
 
         config.to_json(path)
         data = json.loads(path.read_text(encoding="utf-8"))
 
-        self.assertEqual(data["_version"], "1.0.0")
+        self.assertEqual(data["_version"], AIMBOT_V1_VERSION)
+        self.assertIn("V1.1.0", data["_comment"])
+        self.assertEqual(data["_custom_note"], "keep me")
         self.assertNotIn("frame_queue_size", data)
+
+    def test_realtime_inference_keeps_published_frame_queue_default(self):
+        signature = inspect.signature(RealtimeInference)
+
+        self.assertEqual(signature.parameters["frame_queue_size"].default, 3)
+
+    def test_raw_postprocess_keeps_decode_before_threshold_filter(self):
+        detector = CoreMLDetector.__new__(CoreMLDetector)
+        detector.input_shape = (320, 320)
+        detector.decode_cache = {}
+        decode_calls = []
+
+        def decode_grid(input_size, num_anchors):
+            decode_calls.append((input_size, num_anchors))
+            return (
+                np.zeros(num_anchors, dtype=np.float32),
+                np.zeros(num_anchors, dtype=np.float32),
+                np.ones(num_anchors, dtype=np.float32),
+            )
+
+        detector._decode_grid = decode_grid
+        predictions = {
+            "output": np.array([[
+                [0.0, 0.0, 0.0, 0.0, 0.10, 0.20, 0.30],
+                [0.0, 0.0, 0.0, 0.0, 0.05, 0.10, 0.10],
+            ]], dtype=np.float32)
+        }
+
+        detections = detector._parse_raw_predictions(predictions, confidence_threshold=0.9, iou_threshold=0.3)
+
+        self.assertEqual(detections, [])
+        self.assertEqual(decode_calls, [(320, 2)])
 
     def test_web_tuner_applies_live_fields_and_saves_config(self):
         config = AimbotConfigV1()
@@ -222,6 +264,12 @@ class V1Tests(unittest.TestCase):
         self.assertEqual(data["pid_kp"], 0.5)
         self.assertEqual(data["detection_confidence_threshold"], 0.42)
         self.assertEqual(data["trigger_button_secondary"], "side2")
+
+    def test_web_tuner_snapshot_exposes_runtime_version(self):
+        v1_1 = WebTuner(AimbotConfigV1(), self._write_temp_config({})).snapshot()
+
+        self.assertEqual(v1_1["runtime"]["version"], "1.1.0")
+        self.assertIn("v1.config", v1_1["runtime"]["config_class"])
 
     def test_web_tuner_limits_trigger_buttons_to_requested_mouse_inputs(self):
         tuner = WebTuner(AimbotConfigV1(), self._write_temp_config({}))

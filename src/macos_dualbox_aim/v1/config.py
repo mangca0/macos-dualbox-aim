@@ -3,6 +3,8 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Set
 
+AIMBOT_V1_VERSION = "1.1.0"
+
 BUTTON_NAMES = {"left", "right", "middle", "side1", "side2"}
 LOCK_MODES = {"toggle", "hold"}
 PIXEL_FORMATS = {"MJPEG", "MJPG", "YUY2", "RGB3", "BGR3", "UYVY"}
@@ -90,6 +92,10 @@ class AimbotConfigV1:
     pid_kd: float = 0.0
     pid_kf: float = 0.0
 
+    @property
+    def version(self) -> str:
+        return AIMBOT_V1_VERSION
+
     @classmethod
     def from_json(cls, path: str | Path) -> "AimbotConfigV1":
         with Path(path).open("r", encoding="utf-8") as handle:
@@ -156,8 +162,8 @@ class AimbotConfigV1:
 
     def to_json(self, path: str | Path):
         data: Dict[str, Any] = {
-            "_comment": "macos-dualbox-aim V1 - minimal PIDF runtime",
-            "_version": "1.0.0",
+            "_comment": "macos-dualbox-aim V1.1.0 - V1.0 runtime behavior with latency analysis tooling",
+            "_version": AIMBOT_V1_VERSION,
             "_description": "capture -> CoreML detections -> screen-center bbox error -> aim offset -> PIDF -> KMBox",
         }
         output = Path(path)
@@ -165,9 +171,14 @@ class AimbotConfigV1:
             try:
                 existing = json.loads(output.read_text(encoding="utf-8"))
                 if isinstance(existing, dict):
-                    data.update({key: value for key, value in existing.items() if key.startswith("_")})
+                    data.update({
+                        key: value
+                        for key, value in existing.items()
+                        if key.startswith("_") and key not in {"_comment", "_version", "_description"}
+                    })
             except (OSError, json.JSONDecodeError):
                 pass
+        data["_version"] = AIMBOT_V1_VERSION
         raw = asdict(self)
         raw["class_priority_weights"] = {str(key): value for key, value in self.class_priority_weights.items()}
         data.update(raw)

@@ -1,7 +1,7 @@
 [project]
 name = "macos-dualbox-aim"
-version = "0.1.0"
-description = "Minimal V1 PIDF aim runtime for macOS dual-box setup"
+version = "1.1.0"
+description = "V1 PIDF aim runtime with latency analysis tooling for macOS dual-box setup"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

@@ -93,6 +93,14 @@ class WebTuner:
 
     def snapshot_locked(self) -> Dict[str, Any]:
         return {
+            "runtime": {
+                "version": getattr(self.config, "version", None),
+                "config_class": f"{type(self.config).__module__}.{type(self.config).__name__}",
+                "engine_class": (
+                    f"{type(self.engine).__module__}.{type(self.engine).__name__}"
+                    if self.engine is not None else None
+                ),
+            },
             "config": {
                 "pid_kp": self.config.pid_kp,
                 "pid_ki": self.config.pid_ki,

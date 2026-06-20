@@ -1,6 +1,6 @@
-# macos-dualbox-aim V1
+# macos-dualbox-aim V1.1.0
 
-干净的 V1 系统雏形，只保留：
+V1.1.0 是基于 V1.0.0 独立出来的延迟分析工具版本，只保留：
 
 - 配置加载
 - 实时 CoreML 推理入口
@@ -9,6 +9,12 @@
 - 四参 PIDF 控制器
 - KMBox 热键监控与相对鼠标移动
 - Web tuner 实时调参与保存配置
+
+## V1.1.0 延迟分析
+
+V1.1.0 保留 V1.0.0 的运行链路行为，并新增 tuner 延迟采集、对比报告和 runtime 版本防误标能力。
+已验证的一轮微优化没有带来实际可感知的平均延迟改善，记录见
+`docs/latency-optimization-attempts.md`。
 
 ## 常用命令
 
@@ -20,6 +26,24 @@ uv run python -m unittest discover -s tests
 
 默认配置在 `configs/config_v1.json`。
 主程序运行后默认在 `http://127.0.0.1:8765` 提供 V1 tuner。
+
+## 延迟分析工具
+
+先启动主程序，确认 tuner 在运行。每次采集会从
+`http://127.0.0.1:8765/api/config` 拉取 tuner 延迟快照，并写入 `latency_runs/`。
+
+```bash
+uv run python scripts/main_v1.py
+
+for i in 1 2 3 4 5; do
+  uv run python scripts/latency_tool.py capture --label v1.1.0 --run run$i --duration 60 --interval 0.5
+done
+
+uv run python scripts/latency_tool.py compare "latency_runs/*.jsonl" --baseline-label v1.0.0 --candidate-label v1.1.0 --out latency_runs/v1.0.0_vs_v1.1.0.md
+```
+
+对比报告里的主平均值使用 tuner 返回的 `latency.avg`，也就是每次抓到的 tuner 滚动平均值再做 run 间汇总；负数 delta/change 表示 candidate 更快。
+采集工具会检查 `--label` 是否匹配 tuner 返回的 runtime 版本，避免误标。跨版本对比时，先切到对应 tag/分支运行主程序并用匹配的 label 采集，再回到当前版本生成 compare 报告。
 
 ## 版本目录
 

@@ -14,6 +14,7 @@ __pycache__/
 
 # Local runtime artifacts
 *.log
+latency_runs/
 
 # Model binaries are local artifacts unless explicitly versioned with Git LFS.
 models/
