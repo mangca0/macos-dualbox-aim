@@ -1,0 +1,19 @@
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local environments and caches
+.venv/
+.uv-cache/
+
+# Local runtime artifacts
+*.log
+
+# Model binaries are local artifacts unless explicitly versioned with Git LFS.
+models/
