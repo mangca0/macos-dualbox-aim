@@ -24,6 +24,27 @@ Separate two possible explanations for the main runtime capture slowdown:
 
 Run the V1.2.2 `thread` probe before changing the main runtime. If `busy9 thread` keeps `avg_frame_interval_ms` near the standalone 8.3 ms baseline, deprioritize simple CPU/GIL contention and look at CoreML/AVFoundation/runtime interaction. If it degrades toward the main runtime 9.7-10 ms capture interval, investigate thread scheduling and capture/inference handoff before touching postprocess or controller code.
 
+### Measurement
+
+User ran `MJPEG 1920x1080 120fps --load busy --load-ms 9 --load-placement thread`.
+
+| metric | value |
+|---|---:|
+| `avg_read_ms` | 21.356 |
+| `avg_grab_ms` | 11.994 |
+| `avg_retrieve_ms` | 9.363 |
+| `avg_frame_interval_ms` | 21.358 |
+| `effective_fps` | 47.156 |
+| `avg_load_ms` | 9.000 |
+| `load_iterations` | 491 |
+| `avg_load_period_ms` | 9.004 |
+
+This reproduces a strong same-process contention effect, but it is stronger than the main runtime capture slowdown. Treat it as evidence that Python busy-thread contention can severely disturb capture timing, not as proof that CoreML's real load has the same mechanism.
+
+### Next
+
+Run `sleep9 thread` as a control. If sleep-thread capture stays near the 8.3 ms standalone baseline, the `busy9 thread` degradation is likely from CPU/GIL contention rather than merely having another thread scheduled. If sleep-thread also degrades, investigate capture/backend thread interaction more broadly.
+
 ## 2026-06-20: V1.2.1 capture load probe release
 
 ### Status
