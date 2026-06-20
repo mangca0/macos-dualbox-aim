@@ -41,9 +41,24 @@ User ran `MJPEG 1920x1080 120fps --load busy --load-ms 9 --load-placement thread
 
 This reproduces a strong same-process contention effect, but it is stronger than the main runtime capture slowdown. Treat it as evidence that Python busy-thread contention can severely disturb capture timing, not as proof that CoreML's real load has the same mechanism.
 
+User then ran the matching `sleep9 thread` control.
+
+| metric | value |
+|---|---:|
+| `avg_read_ms` | 8.558 |
+| `avg_grab_ms` | 7.865 |
+| `avg_retrieve_ms` | 0.693 |
+| `avg_frame_interval_ms` | 8.565 |
+| `effective_fps` | 117.4 |
+| `avg_load_ms` | 10.813 |
+| `load_iterations` | 157 |
+| `avg_load_period_ms` | 10.820 |
+
+The sleep-thread control stays close to the standalone capture baseline. This suggests the severe `busy9 thread` degradation is not caused by simply having a second thread or a 9 ms cadence in the process; it is specifically tied to active CPU/GIL contention from the Python busy loop.
+
 ### Next
 
-Run `sleep9 thread` as a control. If sleep-thread capture stays near the 8.3 ms standalone baseline, the `busy9 thread` degradation is likely from CPU/GIL contention rather than merely having another thread scheduled. If sleep-thread also degrades, investigate capture/backend thread interaction more broadly.
+Do not use Python busy-loop load as a direct proxy for CoreML. The next useful distinction is real-runtime scheduling: either add a capture/inference overlap diagnostic to the main runtime, or add a separate-process capture probe to see whether isolating capture from Python/CoreML scheduling pressure restores the 8.3 ms capture cadence.
 
 ## 2026-06-20: V1.2.1 capture load probe release
 

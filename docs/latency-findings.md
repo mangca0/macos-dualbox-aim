@@ -22,12 +22,13 @@ This file records stable conclusions from V1 latency experiments. Raw captures a
 - V1.2.1 inline load probe is intentionally serial: it runs capture, then load, then captures again. It proves that serial capture plus 9 ms work drops effective cadence to about 60fps, but it does not model the threaded main runtime.
 - V1.2.2 adds a threaded load probe so capture can run continuously while `sleep` or `busy` load is generated in the same process. Use this before making any main runtime scheduling change.
 - V1.2.2 `busy9 thread` measured `avg_frame_interval_ms` around 21.36 ms and `effective_fps` around 47fps. This proves Python same-process busy contention can severely degrade capture, but the degradation is stronger than the main runtime and should not be treated as a direct CoreML model.
+- V1.2.2 `sleep9 thread` measured `avg_frame_interval_ms` around 8.57 ms and `effective_fps` around 117fps. That makes simple background-thread presence or a 9 ms timing cadence unlikely to be the main cause of capture degradation.
 - A lower `avg_grab_ms` under inline load does not mean capture got faster. It can mean the next frame was already waiting in the backend buffer after the artificial load.
 - Threaded load probe interpretation should compare no-load, `sleep9 thread`, and `busy9 thread` against the main runtime `capture_frame_interval_ms`/`capture_read_ms`.
 
 ## Direction
 
 - Do not spend more time on color format switching unless a new device/backend shows different measured behavior.
-- Next capture-side experiment: run `sleep9 thread` as the control for the severe `busy9 thread` degradation.
-- If threaded load does not reproduce the main runtime capture degradation, shift attention to CoreML runtime/model optimization.
-- If threaded load reproduces the degradation, investigate thread scheduling, capture/inference handoff, and queue freshness rather than postprocess or controller micro-optimizations.
+- Do not use Python busy-loop load as a direct proxy for CoreML. It is useful only as a stress signal for CPU/GIL contention.
+- Next capture-side experiment: add a real-runtime overlap diagnostic or separate-process capture probe to decide whether isolating capture from Python/CoreML scheduling pressure restores the standalone 8.3 ms cadence.
+- Keep postprocess and controller micro-optimizations deprioritized until capture/CoreML scheduling and model runtime options are exhausted.
