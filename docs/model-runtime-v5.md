@@ -108,3 +108,50 @@ Before a model becomes a runtime candidate, record:
 
 For aim quality, decoded target stability matters more than raw tensor mean
 absolute error alone.
+
+## Probe Command
+
+After conversion, run the offline probe before wiring the model into KMBox:
+
+```bash
+uv run python scripts/probe_v5_model.py \
+  --check-model models/converted/cs2_fp16_fp32_check.mlpackage \
+  --fast-model models/converted/cs2_fp16_fp16_fast.mlpackage \
+  --runs 20 \
+  --warmup 5 \
+  --out latency_runs/v5_cs2_fp16_probe_black.json
+```
+
+Pass `--image /path/to/frame.png` to validate decoded detections on a real
+capture frame. The default black-frame probe is only a runtime smoke test and
+latency baseline.
+
+## Manual Validation
+
+2026-06-21 manual capture-card validation confirmed both converted packages are
+usable:
+
+- `models/converted/cs2_fp16_fp32_check.mlpackage`
+- `models/converted/cs2_fp16_fp16_fast.mlpackage`
+
+Both packages use `ImageType` input and YOLOv8 raw tensor output. The next V5
+step is wiring the fast package into the realtime chain while keeping the V4
+controller and KMBox behavior unchanged.
+
+## Realtime V5 Entry
+
+`scripts/main_v5.py` uses:
+
+- V5 `RealtimeInferenceV5` and `CoreMLDetectorV5` for capture-crop inference.
+- V5 `configs/config_v5.json` for `model_path`, `class_count`, and initial
+  detection thresholds.
+- V4 `configs/config_v4.json` for KMBox, hotkey, tuner, capture settings, and
+  the learned MPID controller.
+
+This keeps the first realtime V5 test focused on model-runtime performance and
+box quality. It does not change target selection, hotkey semantics, KMBox packet
+format, or mouse movement semantics.
+
+```bash
+uv run python scripts/main_v5.py
+```

@@ -1,9 +1,11 @@
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 
 from macos_dualbox_aim.v5.config import AIMBOT_V5_VERSION, ModelRuntimeConfigV5
+from macos_dualbox_aim.v5.inference import RealtimeInferenceV5
 from macos_dualbox_aim.v5.model_runtime.adapters import YoloV8TensorAdapter
 from macos_dualbox_aim.v5.model_runtime.contract import (
     FeatureSpec,
@@ -20,7 +22,7 @@ class V5ModelRuntimeTests(unittest.TestCase):
         config = ModelRuntimeConfigV5()
 
         self.assertEqual(config.version, AIMBOT_V5_VERSION)
-        self.assertEqual(config.model_path, "models/cs2_fp16.mlpackage")
+        self.assertEqual(config.model_path, "models/converted/cs2_fp16_fp16_fast.mlpackage")
         self.assertEqual(config.class_count, 4)
         self.assertTrue(config.prefer_image_input)
 
@@ -102,6 +104,43 @@ class V5ModelRuntimeTests(unittest.TestCase):
         self.assertEqual(contract.output_names, ("output0",))
         self.assertEqual(contract.output_layout, OutputLayout.CHANNELS_FIRST)
         self.assertEqual(contract.adapter_name, "yolov8")
+
+    def test_realtime_inference_v5_uses_v5_detector_with_class_count(self):
+        with patch("macos_dualbox_aim.v5.inference.CoreMLDetectorV5") as detector_cls:
+            engine = RealtimeInferenceV5(
+                model_path="models/converted/cs2_fp16_fp16_fast.mlpackage",
+                class_count=4,
+                crop_size=(320, 320),
+                capture_resolution=(1920, 1080),
+            )
+
+        detector_cls.assert_called_once_with(
+            "models/converted/cs2_fp16_fp16_fast.mlpackage",
+            class_count=4,
+        )
+        self.assertEqual(engine.crop_offset, (800, 380))
+        self.assertIs(engine.detector.detector, detector_cls.return_value)
+
+    def test_realtime_inference_v5_detector_adapter_returns_v1_timing_shape(self):
+        with patch("macos_dualbox_aim.v5.inference.CoreMLDetectorV5") as detector_cls:
+            detector_cls.return_value.predict_with_timing.return_value = (
+                [{"bbox": [0.5, 0.5, 0.1, 0.1], "confidence": 0.9, "class_id": 1}],
+                {"output0": np.zeros((1, 8, 1), dtype=np.float32)},
+                {"coreml_ms": 1.0},
+            )
+            engine = RealtimeInferenceV5(
+                model_path="models/converted/cs2_fp16_fp16_fast.mlpackage",
+                class_count=4,
+            )
+
+        detections, timings = engine.detector.predict_with_timing(
+            np.zeros((320, 320, 3), dtype=np.uint8),
+            0.3,
+            0.65,
+        )
+
+        self.assertEqual(len(detections), 1)
+        self.assertEqual(timings, {"coreml_ms": 1.0})
 
 
 if __name__ == "__main__":

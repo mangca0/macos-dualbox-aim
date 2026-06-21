@@ -2,7 +2,7 @@
   "_comment": "macos-dualbox-aim V5.0.0-runtime-draft - model runtime architecture draft",
   "_version": "5.0.0-runtime-draft",
   "_description": "ONNX source -> Core ML fp32_check/fp16_fast packages -> adapter-based detections",
-  "model_path": "models/converted/cs2_fp16_fp32_check.mlpackage",
+  "model_path": "models/converted/cs2_fp16_fp16_fast.mlpackage",
   "class_count": 4,
   "confidence_threshold": 0.65,
   "iou_threshold": 0.3,

@@ -9,7 +9,16 @@ Concise release notes. Detailed experiment rationale lives in `docs/latency-opti
 - Added Core ML contract inspection that classifies existing `ImageType` NMS models and direct ONNX-style tensor models.
 - Added `scripts/convert_onnx_to_coreml.py`, which creates FP32 check and FP16 fast Core ML packages from one ONNX source.
 - Documented the V5 model-runtime contract in `docs/model-runtime-v5.md`.
+- Confirmed the converted `cs2_fp16` FP32 check and FP16 fast packages are usable on live capture-card frames.
+- Added `scripts/main_v5.py`, which runs V5 Core ML model inference while reusing the V4 controller, KMBox, hotkey, and tuner stack.
 - V1-V4 runtime files and config schemas remain unchanged.
+
+## v3.0.0
+
+- Added independent V3 entrypoint, config, package path, and tuner.
+- Ported the C++ multi-object tracker into Python with the same `DetectionObject` shape, 7-state Kalman model, IoU/distance/shape matching cost, Hungarian assignment, generate confirmation threshold, and terminate deletion threshold.
+- V3 keeps only the existing capture card, CoreML inference, and KMBox transport. After CoreML boxes are produced, V3 runs the C++-style multi-object tracker and sends the first confirmed track center error directly to KMBox.
+- V1 and V2 runtime files and config schemas remain unchanged.
 
 ## v2.0.0
 

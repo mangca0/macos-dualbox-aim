@@ -15,7 +15,7 @@ STR_FIELDS = {"model_path", "adapter"}
 
 @dataclass
 class ModelRuntimeConfigV5:
-    model_path: str = "models/cs2_fp16.mlpackage"
+    model_path: str = "models/converted/cs2_fp16_fp16_fast.mlpackage"
     class_count: int = 4
     confidence_threshold: float = 0.65
     iou_threshold: float = 0.3

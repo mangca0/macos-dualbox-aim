@@ -1,4 +1,5 @@
 from pathlib import Path
+import time
 from typing import Dict, List
 
 import cv2
@@ -33,8 +34,32 @@ class CoreMLDetectorV5:
         self.adapter = self._build_adapter(self.contract)
 
     def predict(self, image: np.ndarray, iou_threshold: float, confidence_threshold: float) -> List[Dict]:
-        predictions = self.model.predict({self.contract.input_name: self._preprocess(image)})
-        return self.adapter.parse(predictions, confidence_threshold, iou_threshold)
+        detections, _predictions, _timings = self.predict_with_timing(image, iou_threshold, confidence_threshold)
+        return detections
+
+    def predict_with_timing(
+        self,
+        image: np.ndarray,
+        iou_threshold: float,
+        confidence_threshold: float,
+    ) -> tuple[List[Dict], Dict, Dict[str, float]]:
+        preprocess_start = time.perf_counter()
+        model_input = self._preprocess(image)
+        preprocess_ms = (time.perf_counter() - preprocess_start) * 1000.0
+
+        model_start = time.perf_counter()
+        predictions = self.model.predict({self.contract.input_name: model_input})
+        coreml_ms = (time.perf_counter() - model_start) * 1000.0
+
+        postprocess_start = time.perf_counter()
+        detections = self.adapter.parse(predictions, confidence_threshold, iou_threshold)
+        postprocess_ms = (time.perf_counter() - postprocess_start) * 1000.0
+        return detections, predictions, {
+            "preprocess_ms": preprocess_ms,
+            "coreml_ms": coreml_ms,
+            "postprocess_ms": postprocess_ms,
+            "inference_ms": preprocess_ms + coreml_ms + postprocess_ms,
+        }
 
     def _preprocess(self, image: np.ndarray):
         expected_h, expected_w = self.contract.input_size
