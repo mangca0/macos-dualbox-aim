@@ -2,6 +2,15 @@
 
 Concise release notes. Detailed experiment rationale lives in `docs/latency-optimization-attempts.md`; stable conclusions live in `docs/latency-findings.md`.
 
+## v5.0.0-runtime-draft
+
+- Added the V5 model-runtime architecture boundary for ONNX-to-CoreML conversion, Core ML interface contracts, and detector adapters.
+- Added `YoloV8TensorAdapter` for raw YOLOv8 outputs shaped `[1, 4 + classes, anchors]` or `[1, anchors, 4 + classes]`.
+- Added Core ML contract inspection that classifies existing `ImageType` NMS models and direct ONNX-style tensor models.
+- Added `scripts/convert_onnx_to_coreml.py`, which creates FP32 check and FP16 fast Core ML packages from one ONNX source.
+- Documented the V5 model-runtime contract in `docs/model-runtime-v5.md`.
+- V1-V4 runtime files and config schemas remain unchanged.
+
 ## v2.0.0
 
 - Added independent V2 entrypoint, config, package path, and tuner.
