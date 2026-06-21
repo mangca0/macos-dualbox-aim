@@ -1,35 +1,49 @@
 # Latency Findings
 
-This file records stable conclusions from V1 latency experiments. Raw captures and per-version experiment history stay in `latency_runs/` and `docs/latency-optimization-attempts.md`.
+Stable conclusions only. Raw captures and generated reports stay in
+`latency_runs/`; version summaries stay in `docs/releases.md`.
 
-## Current Bottlenecks
+## Bottlenecks
 
-- Total measured runtime latency is dominated by capture and CoreML inference.
-- In V1.1.0 comparisons, `capture_read_ms` was about 45% of `read_included_total_ms`, and `coreml_ms` was about 42%.
-- Control-side work is not a first-order latency target right now: `target_select_ms`, `pid_ms`, and `kmbox_send_ack_ms` are sub-millisecond in the collected runs.
-- As of V1.2.3, the main runtime is rolled back to the V1.0 `capture.read()` path. Fine-grained grab/retrieve/frame-interval diagnostics remain available only through the standalone capture probe.
+- Runtime latency is dominated by capture and CoreML inference.
+- In the V1.1.0 comparison, `capture_read_ms` was about 45% of
+  `read_included_total_ms`, and `coreml_ms` was about 42%.
+- Target selection, PID/controller work, and KMBox send timing have been
+  sub-millisecond in collected runs. Do not start latency work there unless new
+  measurements contradict this.
+- Micro-optimizing postprocess, target ranking, queue size, or latency snapshot
+  aggregation did not produce meaningful aim improvement.
 
-## Capture Path
+## Capture
 
-- At 1920x1080, AVFoundation appears to deliver about 120fps in practice, even when 240fps is requested.
-- Color format switching did not produce meaningful capture latency differences in the V1.2.0 probe. MJPEG, YUY2, UYVY, RGB3, and BGR3 were all within about 0.1-0.2 ms in the tested matrix.
-- In diagnostic versions, the capture read cost was mostly `capture_grab_ms`, which pointed to waiting for the backend/device to deliver a frame, not expensive post-retrieve processing.
-- `capture_retrieve_ms` was usually small, but could spike in the main runtime p95. That makes tail latency worth watching in future diagnostic builds even when average retrieve time looks harmless.
-- OpenCV/AVFoundation reported properties are not always enough. Prefer standalone probe `capture_frame_interval_ms` and `effective_fps` over only trusting reported FPS.
+- At 1920x1080, the tested AVFoundation/OpenCV path behaved like about 120fps
+  in practice, even when 240fps was requested.
+- Color format switching did not materially improve capture latency on the
+  tested device. MJPEG, YUY2, UYVY, RGB3, and BGR3 were within roughly
+  0.1-0.2 ms in the V1.2.0 matrix.
+- In diagnostic builds, capture read cost was mostly `capture_grab_ms`, which
+  means waiting for the backend/device dominated over post-retrieve processing.
+- OpenCV-reported properties are not enough. Prefer measured
+  `avg_frame_interval_ms` and `effective_fps` from `scripts/capture_probe.py`.
 
 ## Probe Interpretation
 
-- V1.2.0 standalone capture probe showed roughly 8.3 ms frame intervals for 1080p120 capture.
-- V1.2.1 inline load probe is intentionally serial: it runs capture, then load, then captures again. It proves that serial capture plus 9 ms work drops effective cadence to about 60fps, but it does not model the threaded main runtime.
-- V1.2.2 adds a threaded load probe so capture can run continuously while `sleep` or `busy` load is generated in the same process. Use this before making any main runtime scheduling change.
-- V1.2.2 `busy9 thread` measured `avg_frame_interval_ms` around 21.36 ms and `effective_fps` around 47fps. This proves Python same-process busy contention can severely degrade capture, but the degradation is stronger than the main runtime and should not be treated as a direct CoreML model.
-- V1.2.2 `sleep9 thread` measured `avg_frame_interval_ms` around 8.57 ms and `effective_fps` around 117fps. That makes simple background-thread presence or a 9 ms timing cadence unlikely to be the main cause of capture degradation.
-- A lower `avg_grab_ms` under inline load does not mean capture got faster. It can mean the next frame was already waiting in the backend buffer after the artificial load.
-- Threaded load probe interpretation should compare no-load, `sleep9 thread`, and `busy9 thread` against the main runtime `capture_frame_interval_ms`/`capture_read_ms`.
+- Standalone 1080p120 capture probe baseline was roughly 8.3 ms frame interval.
+- Inline load probes are intentionally serial and do not model the threaded main
+  runtime.
+- `sleep9 thread` stayed near the standalone baseline, so a second thread or
+  9 ms cadence alone was not the problem.
+- `busy9 thread` degraded capture severely, proving Python CPU/GIL contention can
+  disturb capture timing. It is a stress signal, not a direct CoreML proxy.
+- A lower `avg_grab_ms` under inline load can mean the next frame was already
+  buffered, not that capture got faster.
 
 ## Direction
 
-- Do not spend more time on color format switching unless a new device/backend shows different measured behavior.
-- Do not use Python busy-loop load as a direct proxy for CoreML. It is useful only as a stress signal for CPU/GIL contention.
-- Next capture-side experiment: add a real-runtime overlap diagnostic or separate-process capture probe to decide whether isolating capture from Python/CoreML scheduling pressure restores the standalone 8.3 ms cadence.
-- Keep postprocess and controller micro-optimizations deprioritized until capture/CoreML scheduling and model runtime options are exhausted.
+- Keep capture diagnostics outside the main runtime first, or isolate them in a
+  short-lived diagnostic version.
+- Next useful capture experiment: separate-process capture or real-runtime
+  overlap diagnostics to test whether isolating capture from Python/CoreML
+  scheduling restores the standalone cadence.
+- Keep model-runtime optimization ahead of controller micro-optimization while
+  capture/CoreML dominate.

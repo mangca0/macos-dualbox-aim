@@ -4,7 +4,7 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from macos_dualbox_aim.v1 import HotkeyConfig, HotkeyMonitor
+from macos_dualbox_aim.core import HotkeyConfig, HotkeyMonitor
 from macos_dualbox_aim.v4 import AimbotConfigV4, AimbotV4, WebTuner
 from macos_dualbox_aim.v5 import ModelRuntimeConfigV5, RealtimeInferenceV5
 

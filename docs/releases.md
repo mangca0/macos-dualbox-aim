@@ -1,6 +1,17 @@
 # Releases
 
-Concise release notes. Detailed experiment rationale lives in `docs/latency-optimization-attempts.md`; stable conclusions live in `docs/latency-findings.md`.
+Concise release notes. Architecture and operational docs live in README and the
+focused files under `docs/`. Latency experiment rationale lives in
+`docs/latency-optimization-attempts.md`; stable conclusions live in
+`docs/latency-findings.md`.
+
+## core-runtime-base
+
+- Promoted the validated V5 architecture into `src/macos_dualbox_aim/core/` as the future shared base.
+- Added core modules for capture-card setup/cropping, realtime inference orchestration, Core ML model runtime, KMBox transport, and KMBox hotkey monitoring.
+- Kept V1-V5 import paths compatible by turning repeated KMBox, hotkey, capture probe, and V5 model-runtime modules into compatibility exports.
+- Switched V5 realtime inference away from inheriting V1 inference; it now uses the core realtime base with a V5-compatible wrapper.
+- Old inference/capture files remain historical compatibility surfaces and should not receive new feature work.
 
 ## v5.0.0-runtime-draft
 
@@ -8,7 +19,7 @@ Concise release notes. Detailed experiment rationale lives in `docs/latency-opti
 - Added `YoloV8TensorAdapter` for raw YOLOv8 outputs shaped `[1, 4 + classes, anchors]` or `[1, anchors, 4 + classes]`.
 - Added Core ML contract inspection that classifies existing `ImageType` NMS models and direct ONNX-style tensor models.
 - Added `scripts/convert_onnx_to_coreml.py`, which creates FP32 check and FP16 fast Core ML packages from one ONNX source.
-- Documented the V5 model-runtime contract in `docs/model-runtime-v5.md`.
+- Documented the model-runtime contract in `docs/model-runtime.md`.
 - Confirmed the converted `cs2_fp16` FP32 check and FP16 fast packages are usable on live capture-card frames.
 - Added `scripts/main_v5.py`, which runs V5 Core ML model inference while reusing the V4 controller, KMBox, hotkey, and tuner stack.
 - V1-V4 runtime files and config schemas remain unchanged.

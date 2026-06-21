@@ -1,77 +1,114 @@
 # macos-dualbox-aim Agent Notes
 
-> 控制在 8KB 内。只记录代码里不容易稳定推断、且协作中真实踩过或很容易踩到的坑。
+> Keep this under 8KB. Record only rules and pitfalls that are hard to infer
+> from code or have caused real confusion.
 
-> 开始任何非 trivial 任务之前，先用2-3个问题确认需求范围和验收标准，得到我的回答后再开干。
+## Collaboration Rules
 
-> 所有改动都要独立出一个更新的版本，经人为测试后，再并入原程序，一定不能在已有的系统上更改。
+- Before any non-trivial task, ask 2-3 questions to confirm scope and acceptance
+  criteria, then wait for the user's answer.
+- Behavior-changing work must land as an independent updated version first. Do
+  not silently change an existing stable path.
+- Use `uv` for Python environments, dependencies, scripts, and CLI tools.
+- Before finishing code changes, at minimum run syntax checks for changed Python
+  files. If config fields changed, state which version consumes them.
 
-## 项目定位
+## Project Boundary
 
-macos-dualbox-aim 运行在 macOS 算力机上，通过采集卡接收游戏机画面，用 CoreML/YOLO 做实时目标检测，再经由 KMBox Net 向游戏机发送硬件鼠标输入。
+The macOS machine captures console video, runs CoreML/YOLO detection, selects a
+target, computes control output, and sends relative mouse input through KMBox.
 
-- 游戏机只运行游戏并接收鼠标输入。
-- 算力机负责采集、推理、目标选择、控制算法和 KMBox 通信。
-- 本项目不应依赖修改游戏进程、读写游戏内存或注入客户端。
+- The console only runs the game and receives mouse input.
+- Do not depend on game process modification, memory reads, or client injection.
 
-## 当前主线
+## Architecture
 
-- `scripts/main_v1.py` 是当前 V1 主入口。
-- `src/macos_dualbox_aim/__init__.py` 可能落后于实验分支；新增 V1 能力时同步检查导出。
+- `src/macos_dualbox_aim/core/` is the future shared base:
+  capture card, realtime inference, CoreML model runtime, KMBox transport, and
+  KMBox physical hotkey monitoring.
+- Future versions should use `core` and implement only target selection,
+  control systems, version config, tuner behavior, and entrypoint assembly.
+- Old version-local inference/capture files are historical compatibility
+  surfaces. Do not extend them.
+- Package root should not grow behavior modules such as `config.py`,
+  `controller.py`, or `kmbox.py`.
+- `core` must not import from `v1/v2/v3/v4/v5`.
+- Entrypoints should import explicit version packages, e.g.
+  `macos_dualbox_aim.v5`, and shared base modules from
+  `macos_dualbox_aim.core`.
 
-## 文档维护
+Docs:
 
-- `docs/latency-optimization-attempts.md` 记时间线实验日志：目标、改动、测量、结论、下一步。
-- `docs/latency-findings.md` 只沉淀已被数据反复支持的稳定判断，不放流水账。
-- `docs/releases.md` 记简短版本摘要；README 只保留当前可用命令和入口。
-- `latency_runs/` 只放原始采样和自动生成报告；从报告提炼出的结论同步到 docs。
+- `README.md`: commands and doc index
+- `docs/architecture.md`: module/version boundaries
+- `docs/runtime-pipeline.md`: coordinate flow, latency fields, KMBox/hotkey
+- `docs/model-runtime.md`: CoreML model runtime and conversion workflow
+- `docs/latency-findings.md`: stable latency conclusions only
+- `docs/latency-optimization-attempts.md`: short experiment index
+- `docs/releases.md`: concise version history
 
-## 版本边界
+## Version Roles
 
-- `scripts/main_v1.py` 永远只 import `macos_dualbox_aim.v1.*`。
-- `scripts/main_v2.py` 永远只 import `macos_dualbox_aim.v2.*`。
-- 包根目录不放 `config.py`、`controller.py` 这类行为模块或兼容壳。
-- `macos_dualbox_aim.core.*` 只放稳定通用能力。
-- 任何会影响行为的实验，先放到当前 major 目录里。
-- 只有经过多个版本都确认稳定的东西，才上移到 `core/`。
-- 每次发布可用版本打 tag，例如 `v1.1.0-stable` 或 `v1.1.0`。
+- V1: historical PIDF baseline and rollback reference.
+- V2: Kalman target-state experiment.
+- V3: multi-object tracker experiment.
+- V4: learned MPID controller.
+- V5: validated CoreML model-runtime path using V4 control.
 
-## 关键约定
+Promote to `core` only after manual validation or repeated version reuse proves
+the behavior stable.
 
-### 瞄准质量
+## Aiming Quality
 
-- 好的静态瞄准：目标和玩家都不移动时，准星应快速到达目标，并且不过冲；过冲表现为准星越过目标后反向修正、来回震荡。
-- 好的动态瞄准：目标相对玩家移动时，准星应持续贴住目标，尽量不滞后；目标突然改变运动趋势时，应快速响应并继续避免过冲。
+- Static quality: when target and player are still, the aim should reach target
+  quickly without overshoot or oscillation.
+- Dynamic quality: when target moves relative to player, aim should stay on
+  target with minimal lag, respond quickly to trend changes, and still avoid
+  overshoot.
 
-### 坐标系
+## Coordinates
 
-- 推理输入通常是屏幕中心裁剪区域，不是整屏。
-- 检测框可能是归一化 `[cx, cy, w, h]`，也可能是像素 `[x1, y1, x2, y2]`；不要只看变量名判断格式。
-- `crop_offset` 是裁剪区域左上角相对整屏左上角的偏移。
-- 控制器最终需要的是“目标相对瞄准基准的偏移量”，也就是鼠标相对移动误差，不是屏幕绝对坐标。
-- V1 当前以屏幕中心作为瞄准基准，不包含模板匹配准星或颜色分割准星。
-- `_current_aim_x/y`、`target.screen_x/y` 这类字段可能混过绝对坐标和相对偏移；改目标选择前先追一遍调用链。
+- Inference input is usually a screen-center crop, not the full screen.
+- Detection boxes may be normalized `[cx, cy, w, h]` or pixel
+  `[x1, y1, x2, y2]`; confirm format at the adapter/consumer boundary.
+- `crop_offset` is the crop top-left relative to full-screen top-left.
+- Controllers need target offset relative to the aim reference, not absolute
+  screen coordinates.
+- Current V1-style reference is screen center; no template/color crosshair path
+  is in the main chain.
+- Before changing target selection, trace fields like `_current_aim_x/y`,
+  `target.screen_x/y`, and `target.aim_x/y`; historical code has mixed absolute
+  coordinates and relative offsets.
 
-### KMBox
+## KMBox
 
-- KMBox 通信是 UDP 自定义协议，改包结构时要同时核对字段长度、端序和官方协议。
-- 不要轻易改变 `mouse_move(dx, dy)` 的相对移动语义。
-- 监控端口逻辑曾出现自动 `kill -9` 占用端口进程的实现；不要保留或新增这种隐式破坏性副作用。
-- `enc_*`、`mouse_move_auto()` 这类不在主链路上的方法可能没被实测覆盖，改前先查常量、payload 和 pack 结果。
+- KMBox communication is a UDP custom protocol. Packet size, endian order, and
+  command constants matter.
+- Do not change `mouse_move(dx, dy)` relative movement semantics without an
+  explicit behavior decision.
+- Do not add implicit destructive monitor-port cleanup such as auto `kill -9`.
+- Methods outside the main chain, such as `enc_*` or `mouse_move_auto()` if
+  reintroduced, need protocol/payload verification before use.
 
-### 热键
+## Hotkey
 
-- 热键由 KMBox 物理鼠标监控触发，不是 macOS 全局键鼠监听。
-- `trigger_button_secondary` 当前语义按 OR 理解：主键或副键任一按下即可触发。改成 AND 前必须明确说明行为变化。
-- 锁定键用于临时禁用自瞄，不应被误写成额外触发键。
+- Hotkeys come from KMBox physical mouse monitor events, not macOS global input.
+- `trigger_button_secondary` is OR semantics: primary or secondary can trigger.
+  Changing to AND is a behavior change and must be explicit.
+- Lock key temporarily disables aim; it is not an additional trigger key.
 
-### 配置
+## Config
 
-- 修改调参字段时，优先在对应版本的配置文件和控制器实现中双向确认。
+- When changing tuning fields, verify both the version config dataclass and the
+  runtime consumer.
+- V5 uses `configs/config_v5.json` for model runtime and `configs/config_v4.json`
+  for capture/KMBox/hotkey/control.
 
-## 完成标准
+## Latency
 
-一次修改完成前至少确认：
-
-- 修改过的 Python 文件能通过语法检查。
-- 如果改了配置字段，说明该字段在哪个版本生效，避免用户调到无效参数。
+- Capture and CoreML dominate measured latency; controller/KMBox work has been
+  sub-millisecond in collected runs.
+- Use `scripts/capture_probe.py` before changing capture scheduling.
+- Use `scripts/latency_tool.py` for tuner snapshot capture and comparisons.
+- Do not treat Python busy-loop load as a direct CoreML proxy; it is only a
+  same-process contention stress signal.

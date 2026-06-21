@@ -11,7 +11,7 @@ import numpy as np
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from macos_dualbox_aim.v5.model_runtime.detector import CoreMLDetectorV5
+from macos_dualbox_aim.core.model_runtime.detector import CoreMLDetectorV5
 
 
 def parse_args(argv: Sequence[str] | None = None):

@@ -1,14 +1,10 @@
-import logging
-import queue
-import threading
-from collections import deque
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import cv2
 import numpy as np
 
-from ..v1.inference import DetectionResult, Frame, RealtimeInference
-from .model_runtime.detector import CoreMLDetectorV5
+from ..core.inference import DetectionResult, Frame, RealtimeInference
+from ..core.model_runtime.detector import CoreMLDetectorV5
 
 
 class RealtimeInferenceV5(RealtimeInference):
@@ -26,38 +22,18 @@ class RealtimeInferenceV5(RealtimeInference):
         pixel_format: str = "MJPEG",
         frame_queue_size: int = 3,
     ):
-        self.capture_device = capture_device
-        self.target_fps = target_fps
-        self.confidence_threshold = confidence_threshold
-        self.iou_threshold = iou_threshold
-        self.enable_display = enable_display
-        self.crop_size = crop_size
-        self.capture_resolution = capture_resolution
-        self.pixel_format = pixel_format
-        self.frame_queue_size = max(1, int(frame_queue_size))
-        self.crop_offset = (
-            (capture_resolution[0] - crop_size[0]) // 2,
-            (capture_resolution[1] - crop_size[1]) // 2,
+        super().__init__(
+            detector=_RealtimeDetectorAdapter(CoreMLDetectorV5(model_path, class_count=class_count)),
+            capture_device=capture_device,
+            target_fps=target_fps,
+            confidence_threshold=confidence_threshold,
+            iou_threshold=iou_threshold,
+            enable_display=enable_display,
+            crop_size=crop_size,
+            capture_resolution=capture_resolution,
+            pixel_format=pixel_format,
+            frame_queue_size=frame_queue_size,
         )
-
-        self.detector = _RealtimeDetectorAdapter(CoreMLDetectorV5(model_path, class_count=class_count))
-        self.frame_queue: queue.Queue[Frame] = queue.Queue(maxsize=self.frame_queue_size)
-        self.result_queue: queue.Queue[tuple[np.ndarray, DetectionResult]] = queue.Queue(maxsize=3)
-        self.capture_thread: Optional[threading.Thread] = None
-        self.inference_thread: Optional[threading.Thread] = None
-        self.running = False
-        self.frame_id = 0
-        self.inference_times = deque(maxlen=100)
-        self.latency_samples = deque(maxlen=120)
-        self.latency_lock = threading.RLock()
-        self.frames_captured = 0
-        self.frames_inferred = 0
-        self.frames_dropped = 0
-        self.frame_queue_replaced = 0
-        self.frame_queue_drained = 0
-        self.actual_inference_fps = 0.0
-        self.on_detection: Optional[Callable[[DetectionResult], None]] = None
-        self.logger = logging.getLogger(__name__)
 
 
 class _RealtimeDetectorAdapter:
@@ -100,3 +76,6 @@ class _RealtimeDetectorAdapter:
             label = f"{int(detection.get('class_id', 0))} {float(detection.get('confidence', 0.0)):.2f}"
             cv2.putText(output, label, (x1, max(12, y1 - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
         return output
+
+
+__all__ = ["DetectionResult", "Frame", "RealtimeInference", "RealtimeInferenceV5"]
