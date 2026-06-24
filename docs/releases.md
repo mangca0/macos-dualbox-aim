@@ -5,6 +5,21 @@ focused files under `docs/`. Latency experiment rationale lives in
 `docs/latency-optimization-attempts.md`; stable conclusions live in
 `docs/latency-findings.md`.
 
+## v6.1.0
+
+- Added isolated V6.1 experiment files: `scripts/main_v61.py`, `configs/config_v61.json`, and `macos_dualbox_aim.v61`.
+- V6.1 keeps V6 capture, CoreML, tracker, prediction, ramp, and KMBox behavior while adding an adaptive integral gate to the MPID controller.
+- New V6.1 control fields: `pid_integral_gate_enabled`, `pid_integral_gate_threshold`, `pid_integral_gate_rate`, and `target_jump_reset`.
+- `pid_integral_gate_enabled` defaults on so the `Ki` contribution is suppressed on far errors and gradually opens near target; `target_jump_reset` preserves V6's default 40 px reset threshold but makes it tunable.
+
+## v6.0.0
+
+- Added `scripts/main_v6.py`, `configs/config_v6.json`, and `macos_dualbox_aim.v6`.
+- V6 uses `core` for shared capture, CoreML, KMBox, and hotkey foundations, but keeps its version behavior in V6-owned modules.
+- V6 reads only `configs/config_v6.json`; model path, class count, confidence threshold, IoU threshold, control fields, and tracker fields have one config source.
+- V6 combines CoreML detections, learned MPID control, and Kalman+Hungarian multi-object tracking with first confirmed track selection.
+- Added V6 tracker config fields consumed by `AimbotV6`: `tracker_generate`, `tracker_terminate`, `tracker_vx_noise`, `tracker_vy_noise`, `tracker_w_noise`, `tracker_h_noise`, and `tracker_r_std`.
+
 ## core-runtime-base
 
 - Promoted the validated V5 architecture into `src/macos_dualbox_aim/core/` as the future shared base.

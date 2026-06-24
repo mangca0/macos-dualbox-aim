@@ -39,6 +39,8 @@ surfaces and should not be extended.
 | V3 | Multi-object tracker experiment |
 | V4 | Learned MPID controller |
 | V5 | CoreML model-runtime validation on the V4 control chain |
+| V6 | Standalone CoreML runtime, learned MPID control, and multi-object tracker target selection |
+| V6.1 | V6 plus adaptive near-target integral gating and configurable target-jump reset |
 
 Future versions should not fork capture-card or model-runtime plumbing. If a
 shared change is needed, make it in `core` and keep the version layer thin.

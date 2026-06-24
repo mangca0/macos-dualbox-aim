@@ -29,6 +29,12 @@ from .v2 import (
     KalmanState,
     PIDFControllerV2,
 )
+from .v61 import (
+    AIMBOT_V61_VERSION,
+    AimbotConfigV61,
+    AimbotV61,
+    RealtimeInferenceV61,
+)
 
 __all__ = [
     "AimbotConfigV1",
@@ -58,4 +64,8 @@ __all__ = [
     "KalmanFilter2D",
     "KalmanState",
     "PIDFControllerV2",
+    "AIMBOT_V61_VERSION",
+    "AimbotConfigV61",
+    "AimbotV61",
+    "RealtimeInferenceV61",
 ]

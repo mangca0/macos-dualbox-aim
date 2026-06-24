@@ -101,6 +101,11 @@ the behavior stable.
 
 - When changing tuning fields, verify both the version config dataclass and the
   runtime consumer.
+- Tuner checkbox fields must be sent to `/api/config` as real JSON booleans.
+  Do not special-case only one boolean field in JS; a checkbox value converted
+  through `Number(...)` becomes `0/1`, fails `_as_bool`, and can make the UI look
+  changed while the runtime config did not apply. Add/update tuner tests for
+  every new boolean field.
 - V5 uses `configs/config_v5.json` for model runtime and `configs/config_v4.json`
   for capture/KMBox/hotkey/control.
 
