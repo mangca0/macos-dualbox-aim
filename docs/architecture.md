@@ -41,6 +41,8 @@ surfaces and should not be extended.
 | V5 | CoreML model-runtime validation on the V4 control chain |
 | V6 | Standalone CoreML runtime, learned MPID control, and multi-object tracker target selection |
 | V6.1 | V6 plus adaptive near-target integral gating and configurable target-jump reset |
+| V6.2 | V6.1 plus color-detected crosshair aim reference |
+| V6.3 | V6.2 plus model-aware target class selection and tuner class picking |
 
 Future versions should not fork capture-card or model-runtime plumbing. If a
 shared change is needed, make it in `core` and keep the version layer thin.

@@ -15,6 +15,7 @@ from .contract import (
     ModelOutputKind,
     classify_model_contract,
 )
+from .metadata import ModelClassInfo, inspect_model_class_info
 
 
 class CoreMLDetector:
@@ -87,6 +88,21 @@ def inspect_coreml_model(model_path: str, class_count: int) -> ModelContract:
         raise FileNotFoundError(f"Model not found: {model_path}")
     model = ct.models.MLModel(str(model_file))
     return contract_from_spec(model.get_spec(), class_count=class_count)
+
+
+def inspect_coreml_model_classes(
+    model_path: str,
+    fallback_class_count: int | None = None,
+) -> ModelClassInfo:
+    model_file = Path(model_path)
+    if not model_file.exists():
+        raise FileNotFoundError(f"Model not found: {model_path}")
+    model = ct.models.MLModel(str(model_file))
+    return inspect_model_class_info(
+        model_file,
+        model=model,
+        fallback_class_count=fallback_class_count,
+    )
 
 
 def contract_from_spec(spec, class_count: int) -> ModelContract:

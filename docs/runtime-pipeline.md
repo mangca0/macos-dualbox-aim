@@ -24,8 +24,10 @@ selection and control.
   Confirm format at the adapter/consumer boundary.
 - Controllers need target offset relative to the aim reference, not absolute
   screen coordinates.
-- Current V1-style aim reference is the screen center. There is no template or
-  color-based crosshair reference in the current main path.
+- V1 through V6.1 use screen center as the aim reference. V6.2 is the first
+  experiment that detects a color crosshair in the current crop and uses that
+  point as the aim reference; if the crosshair is not found, V6.2 sends no
+  movement for that frame.
 
 When changing target selection, trace fields such as `_current_aim_x/y`,
 `target.screen_x/y`, and `target.aim_x/y`; historical code has mixed absolute

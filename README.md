@@ -12,13 +12,15 @@ the game client.
 
 ```bash
 uv sync
-uv run python scripts/main_v61.py
+uv run python scripts/main_v63.py
 ```
 
 Current practical entrypoints:
 
 | Command | Purpose |
 |---|---|
+| `uv run python scripts/main_v63.py` | V6.3 experiment with V6.2 crosshair aim plus model-aware target class selection in tuner |
+| `uv run python scripts/main_v62.py` | V6.2 experiment with V6.1 control plus color-detected crosshair aim reference |
 | `uv run python scripts/main_v61.py` | V6.1 experiment with V6 runtime plus adaptive integral gating and configurable target-jump reset |
 | `uv run python scripts/main_v6.py` | Standalone CoreML runtime, multi-object tracking, and learned MPID control |
 | `uv run python scripts/main_v5.py` | Current CoreML model-runtime path with V4 control |
@@ -28,9 +30,9 @@ Current practical entrypoints:
 | `uv run python scripts/main_v1.py` | Historical PIDF baseline |
 | `uv run python -m unittest discover -s tests` | Run tests |
 
-Configs live in `configs/`. V6.1 uses only `configs/config_v61.json`; V6 uses
-only `configs/config_v6.json` for model runtime, capture, KMBox, hotkey, tuner,
-controller, and tracker settings. V5
+Configs live in `configs/`. V6.3 uses only `configs/config_v63.json`; V6.2 uses
+only `configs/config_v62.json`; V6.1 uses only `configs/config_v61.json`; V6 uses only `configs/config_v6.json` for model
+runtime, capture, KMBox, hotkey, tuner, controller, and tracker settings. V5
 uses `configs/config_v5.json` for model runtime settings and
 `configs/config_v4.json` for capture, KMBox, hotkey, tuner, and control
 settings. The tuner defaults to `http://127.0.0.1:8765`.

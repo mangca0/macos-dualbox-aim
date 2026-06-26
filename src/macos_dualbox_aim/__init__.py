@@ -35,6 +35,12 @@ from .v61 import (
     AimbotV61,
     RealtimeInferenceV61,
 )
+from .v63 import (
+    AIMBOT_V63_VERSION,
+    AimbotConfigV63,
+    AimbotV63,
+    RealtimeInferenceV63,
+)
 
 __all__ = [
     "AimbotConfigV1",
@@ -68,4 +74,8 @@ __all__ = [
     "AimbotConfigV61",
     "AimbotV61",
     "RealtimeInferenceV61",
+    "AIMBOT_V63_VERSION",
+    "AimbotConfigV63",
+    "AimbotV63",
+    "RealtimeInferenceV63",
 ]
