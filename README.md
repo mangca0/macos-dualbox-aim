@@ -15,6 +15,16 @@ uv sync
 uv run python scripts/main_v63.py
 ```
 
+## Current Stage
+
+V6.3 is the current recommended runtime. It closes the present development
+stage around the shared CoreML runtime, crosshair-referenced aim, multi-object
+tracking, MPID control, KMBox hotkeys, and live tuner class selection.
+
+Use earlier versions as rollback references or isolated experiments. New
+behavior work should start from V6.3 unless there is an explicit reason to
+compare against an older version.
+
 Current practical entrypoints:
 
 | Command | Purpose |

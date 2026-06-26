@@ -5,19 +5,20 @@ focused files under `docs/`. Latency experiment rationale lives in
 `docs/latency-optimization-attempts.md`; stable conclusions live in
 `docs/latency-findings.md`.
 
-## v6.2.0
-
-- Added isolated V6.2 experiment files: `scripts/main_v62.py`, `configs/config_v62.json`, and `macos_dualbox_aim.v62`.
-- V6.2 keeps V6.1 capture, CoreML, tracker, MPID, hotkey, tuner, and KMBox behavior while changing the aim reference from screen center to a color-detected crosshair.
-- Added crosshair config fields for HSV/RGB matching, search radius, and minimum pixel count. If the crosshair is not found, V6.2 stops output for that frame instead of falling back to screen center.
-- `scripts/main_v62.py` passes the current cropped frame into target selection so crosshair detection and CoreML detections use the same crop coordinate space.
-
 ## v6.3.0
 
 - Added isolated V6.3 experiment files: `scripts/main_v63.py`, `configs/config_v63.json`, and `macos_dualbox_aim.v63`.
 - V6.3 keeps V6.2 capture, CoreML, crosshair reference, tracker, MPID, hotkey, tuner, and KMBox behavior while adding model-aware target class selection.
 - Model load now inspects the CoreML package and same-name sidecar metadata to resolve class count and class names; if names are unavailable, V6.3 falls back to `class_0`, `class_1`, and so on.
 - The tuner now shows all model classes and lets the runtime live-select which classes remain eligible for tracking and aim.
+- V6.3 is the current recommended runtime and closes the present development stage; older versions remain available as rollback references or isolated experiments.
+
+## v6.2.0
+
+- Added isolated V6.2 experiment files: `scripts/main_v62.py`, `configs/config_v62.json`, and `macos_dualbox_aim.v62`.
+- V6.2 keeps V6.1 capture, CoreML, tracker, MPID, hotkey, tuner, and KMBox behavior while changing the aim reference from screen center to a color-detected crosshair.
+- Added crosshair config fields for HSV/RGB matching, search radius, and minimum pixel count. If the crosshair is not found, V6.2 stops output for that frame instead of falling back to screen center.
+- `scripts/main_v62.py` passes the current cropped frame into target selection so crosshair detection and CoreML detections use the same crop coordinate space.
 
 ## v6.1.0
 

@@ -32,6 +32,9 @@ surfaces and should not be extended.
 
 ## Version Roles
 
+V6.3 is the current recommended runtime and marks the present stage closure.
+Earlier versions remain as rollback references or isolated experiments.
+
 | Version | Role |
 |---|---|
 | V1 | Historical PIDF baseline and rollback reference |
@@ -42,7 +45,7 @@ surfaces and should not be extended.
 | V6 | Standalone CoreML runtime, learned MPID control, and multi-object tracker target selection |
 | V6.1 | V6 plus adaptive near-target integral gating and configurable target-jump reset |
 | V6.2 | V6.1 plus color-detected crosshair aim reference |
-| V6.3 | V6.2 plus model-aware target class selection and tuner class picking |
+| V6.3 | Current recommended runtime: V6.2 plus model-aware target class selection and tuner class picking |
 
 Future versions should not fork capture-card or model-runtime plumbing. If a
 shared change is needed, make it in `core` and keep the version layer thin.
