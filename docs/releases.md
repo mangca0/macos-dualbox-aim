@@ -5,6 +5,21 @@ focused files under `docs/`. Latency experiment rationale lives in
 `docs/latency-optimization-attempts.md`; stable conclusions live in
 `docs/latency-findings.md`.
 
+## v6.4.0
+
+- Added isolated V6.4 experiment files: `scripts/main_v64.py`, `scripts/auto_tune_v64.py`, `configs/config_v64.json`, and `macos_dualbox_aim.v64`.
+- V6.4 keeps the V6.3 capture, CoreML, class selection, crosshair reference, tracker, hotkey, tuner, and KMBox chain while adding stop-brake anti-overshoot control to the MPID controller.
+- New V6.4 control fields consumed by `AimbotConfigV64`, the runtime, tuner, and auto-tuner: `stop_brake_radius`, `stop_brake_output_decay`, `stop_brake_pred_decay`, and `stop_brake_min_output`. `stop_brake_enabled` is tuner-visible but excluded from auto-search so tuning does not silently disable the feature.
+- Stop-brake triggers per axis when a high-output movement suddenly enters a small error radius while still moving toward the target; it decays predictor/PID state and caps output by remaining error.
+
+## v7.0.0
+
+- Added isolated V7 experiment files: `scripts/main_v7.py`, `configs/config_v7.json`, and `macos_dualbox_aim.v7`.
+- V7 keeps the V6.3 capture, CoreML, class selection, crosshair reference, tracker, hotkey, tuner, and KMBox chain while replacing the controller with a strict Python replica of the C++ incremental PID learning project.
+- Added V7 controller components: `IncrementalPid`, `DerivativePredictor`, `PerlinNoise1D`, `AimOutput`, and `AimController`.
+- Added V7 control fields consumed by `AimbotConfigV7` and the tuner: `output_max` and `noise_amp`. `pid_integral_gate_enabled` remains available as an optional V6.1-style mode but defaults to `false` for strict replica behavior.
+- The tuner now exposes V7 controller debug output (`move_x/y`, `predicted_x/y`, `fused_x/y`, and `curve_len`) separately from latency metrics.
+
 ## v6.3.0
 
 - Added isolated V6.3 experiment files: `scripts/main_v63.py`, `configs/config_v63.json`, and `macos_dualbox_aim.v63`.

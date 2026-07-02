@@ -12,23 +12,27 @@ the game client.
 
 ```bash
 uv sync
-uv run python scripts/main_v63.py
+uv run python scripts/main_v7.py
 ```
 
 ## Current Stage
 
-V6.3 is the current recommended runtime. It closes the present development
-stage around the shared CoreML runtime, crosshair-referenced aim, multi-object
-tracking, MPID control, KMBox hotkeys, and live tuner class selection.
+V7 is the current active runtime experiment and is manually usable, but it is
+not yet a validated replacement for the V6.3 baseline. It keeps the V6.3 shared
+CoreML runtime, crosshair-referenced aim, multi-object tracking, KMBox hotkeys,
+and live tuner class selection while replacing the controller with a strict
+incremental PID replica of the C++ learning project.
 
-Use earlier versions as rollback references or isolated experiments. New
-behavior work should start from V6.3 unless there is an explicit reason to
-compare against an older version.
+Use earlier versions as rollback references or isolated experiments. V6.4 is an
+isolated V6.3-derived stop-brake experiment for high-speed target stops; V7
+remains the strict incremental PID replica line.
 
 Current practical entrypoints:
 
 | Command | Purpose |
 |---|---|
+| `uv run python scripts/main_v7.py` | V7 real-chain experiment with strict incremental PID learning-controller replica, Perlin noise control, and controller debug tuner fields |
+| `uv run python scripts/main_v64.py` | V6.4 experiment with V6.3 behavior plus stop-brake anti-overshoot control for sudden target stops |
 | `uv run python scripts/main_v63.py` | V6.3 experiment with V6.2 crosshair aim plus model-aware target class selection in tuner |
 | `uv run python scripts/main_v62.py` | V6.2 experiment with V6.1 control plus color-detected crosshair aim reference |
 | `uv run python scripts/main_v61.py` | V6.1 experiment with V6 runtime plus adaptive integral gating and configurable target-jump reset |
@@ -40,12 +44,13 @@ Current practical entrypoints:
 | `uv run python scripts/main_v1.py` | Historical PIDF baseline |
 | `uv run python -m unittest discover -s tests` | Run tests |
 
-Configs live in `configs/`. V6.3 uses only `configs/config_v63.json`; V6.2 uses
-only `configs/config_v62.json`; V6.1 uses only `configs/config_v61.json`; V6 uses only `configs/config_v6.json` for model
-runtime, capture, KMBox, hotkey, tuner, controller, and tracker settings. V5
-uses `configs/config_v5.json` for model runtime settings and
-`configs/config_v4.json` for capture, KMBox, hotkey, tuner, and control
-settings. The tuner defaults to `http://127.0.0.1:8765`.
+Configs live in `configs/`. V7 uses only `configs/config_v7.json`; V6.4 uses
+only `configs/config_v64.json`; V6.3 uses only `configs/config_v63.json`; V6.2
+uses only `configs/config_v62.json`; V6.1 uses only `configs/config_v61.json`;
+V6 uses only `configs/config_v6.json` for model runtime, capture, KMBox, hotkey,
+tuner, controller, and tracker settings. V5 uses `configs/config_v5.json` for
+model runtime settings and `configs/config_v4.json` for capture, KMBox, hotkey,
+tuner, and control settings. The tuner defaults to `http://127.0.0.1:8765`.
 
 ## Architecture
 
@@ -67,6 +72,7 @@ Read:
 - `docs/architecture.md` for module boundaries and version policy
 - `docs/runtime-pipeline.md` for coordinate flow and latency fields
 - `docs/model-runtime.md` for CoreML conversion/runtime rules
+- `docs/current-review.md` for the current V7 and auto-tuning assessment
 - `docs/latency-findings.md` for stable latency conclusions
 - `docs/releases.md` for concise version history
 

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
-from .config import AimbotConfigV63
+from .config import AimbotConfigV7
 
 TUNABLE_FIELDS = {
     "selected_class_ids",
@@ -15,6 +15,7 @@ TUNABLE_FIELDS = {
     "pid_kd",
     "slew_limit",
     "max_speed",
+    "output_max",
     "sensitivity",
     "fov_radius",
     "init_scale",
@@ -22,6 +23,7 @@ TUNABLE_FIELDS = {
     "pred_weight_x",
     "pred_weight_y",
     "target_jump_reset",
+    "noise_amp",
     "pid_integral_gate_enabled",
     "pid_integral_gate_threshold",
     "pid_integral_gate_rate",
@@ -60,6 +62,7 @@ CONTROLLER_FIELDS = {
     "pid_kd",
     "slew_limit",
     "max_speed",
+    "output_max",
     "sensitivity",
     "fov_radius",
     "init_scale",
@@ -67,6 +70,7 @@ CONTROLLER_FIELDS = {
     "pred_weight_x",
     "pred_weight_y",
     "target_jump_reset",
+    "noise_amp",
     "pid_integral_gate_enabled",
     "pid_integral_gate_threshold",
     "pid_integral_gate_rate",
@@ -86,7 +90,7 @@ TRIGGER_BUTTON_OPTIONS = ("left", "right", "side1", "side2")
 class WebTuner:
     def __init__(
         self,
-        config: AimbotConfigV63,
+        config: AimbotConfigV7,
         config_path: str | Path,
         *,
         engine: Optional[Any] = None,
@@ -136,6 +140,8 @@ class WebTuner:
         with self.lock:
             self._validate_trigger_buttons(data)
             self.config.update_from_mapping(data, allowed_fields=TUNABLE_FIELDS)
+            if "max_speed" in data and "output_max" not in data:
+                self.config.output_max = self.config.max_speed
             self._apply_runtime_locked()
             if TRACKER_FIELDS & set(data):
                 self._reset_aimbot_tracking_locked()
@@ -167,6 +173,7 @@ class WebTuner:
             "latency": self._latency_snapshot_locked(),
             "aim": self._aim_snapshot_locked(),
             "aim_active": self._aim_active_locked(),
+            "controller": self._controller_snapshot_locked(),
         }
 
     def _latency_snapshot_locked(self) -> Dict[str, Any]:
@@ -212,6 +219,22 @@ class WebTuner:
             return {"available": False, "samples": 0}
         return self.aimbot.get_aim_metrics_snapshot()
 
+    def _controller_snapshot_locked(self) -> Dict[str, Any]:
+        if self.aimbot is None:
+            return {}
+        output = getattr(self.aimbot, "latest_aim_output", None)
+        if output is None:
+            return {}
+        return {
+            "move_x": _as_snapshot_float(getattr(output, "move_x", 0.0)),
+            "move_y": _as_snapshot_float(getattr(output, "move_y", 0.0)),
+            "curve_len": _as_snapshot_float(getattr(output, "curve_len", 0.0)),
+            "predicted_x": _as_snapshot_float(getattr(output, "predicted_x", 0.0)),
+            "predicted_y": _as_snapshot_float(getattr(output, "predicted_y", 0.0)),
+            "fused_x": _as_snapshot_float(getattr(output, "fused_x", 0.0)),
+            "fused_y": _as_snapshot_float(getattr(output, "fused_y", 0.0)),
+        }
+
     def _validate_trigger_buttons(self, data: Dict[str, Any]):
         if "trigger_button" in data and data["trigger_button"] not in TRIGGER_BUTTON_OPTIONS:
             raise ValueError(f"trigger_button must be one of {list(TRIGGER_BUTTON_OPTIONS)}")
@@ -244,6 +267,7 @@ class WebTuner:
             "kd": self.config.pid_kd,
             "slew_limit": self.config.slew_limit,
             "max_speed": self.config.max_speed,
+            "output_max": self.config.output_max,
             "sensitivity": self.config.sensitivity,
             "fov_radius": self.config.fov_radius,
             "init_scale": self.config.init_scale,
@@ -251,6 +275,7 @@ class WebTuner:
             "pred_weight_x": self.config.pred_weight_x,
             "pred_weight_y": self.config.pred_weight_y,
             "target_jump_reset": self.config.target_jump_reset,
+            "noise_amp": self.config.noise_amp,
             "pid_integral_gate_enabled": self.config.pid_integral_gate_enabled,
             "pid_integral_gate_threshold": self.config.pid_integral_gate_threshold,
             "pid_integral_gate_rate": self.config.pid_integral_gate_rate,
@@ -346,12 +371,18 @@ def _as_json_bool(key: str, value: Any) -> bool:
     return value
 
 
+def _as_snapshot_float(value: Any) -> float:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    return 0.0
+
+
 _HTML = """<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Aimbot V6.3 Tuner</title>
+  <title>Aimbot V7 Tuner</title>
   <style>
     :root {
       color-scheme: light;
@@ -587,7 +618,7 @@ _HTML = """<!doctype html>
 </head>
 <body>
   <header>
-    <h1>Aimbot V6.3 Tuner</h1>
+    <h1>Aimbot V7 Tuner</h1>
     <div class="actions">
       <button id="reload" type="button">Reload</button>
       <button id="save" type="button">Save config</button>
@@ -617,6 +648,7 @@ _HTML = """<!doctype html>
       <div class="field"><label for="pid_kd">Kd</label><input id="pid_kd" data-field="pid_kd" type="range" min="0" max="2" step="0.001"><input data-number-for="pid_kd" type="number" min="0" max="2" step="0.001"></div>
       <div class="field"><label for="slew_limit">Slew limit</label><input id="slew_limit" data-field="slew_limit" type="range" min="0" max="200" step="0.1"><input data-number-for="slew_limit" type="number" min="0" max="200" step="0.1"></div>
       <div class="field"><label for="max_speed">Max speed</label><input id="max_speed" data-field="max_speed" type="range" min="1" max="200" step="0.1"><input data-number-for="max_speed" type="number" min="1" max="200" step="0.1"></div>
+      <div class="field"><label for="output_max">Output max</label><input id="output_max" data-field="output_max" type="range" min="1" max="300" step="0.1"><input data-number-for="output_max" type="number" min="1" max="300" step="0.1"></div>
       <div class="field"><label for="sensitivity">Sensitivity</label><input id="sensitivity" data-field="sensitivity" type="range" min="0.01" max="5" step="0.01"><input data-number-for="sensitivity" type="number" min="0.01" max="5" step="0.01"></div>
       <div class="field check"><label for="pid_integral_gate_enabled">Integral gate</label><input id="pid_integral_gate_enabled" data-field="pid_integral_gate_enabled" type="checkbox"></div>
       <div class="field"><label for="pid_integral_gate_threshold">Integral gate threshold</label><input id="pid_integral_gate_threshold" data-field="pid_integral_gate_threshold" type="range" min="1" max="300" step="0.1"><input data-number-for="pid_integral_gate_threshold" type="number" min="1" max="300" step="0.1"></div>
@@ -630,6 +662,12 @@ _HTML = """<!doctype html>
       <div class="field"><label for="ramp_time">Ramp time</label><input id="ramp_time" data-field="ramp_time" type="range" min="0.001" max="2" step="0.001"><input data-number-for="ramp_time" type="number" min="0.001" max="2" step="0.001"></div>
       <div class="field"><label for="pred_weight_x">Pred weight X</label><input id="pred_weight_x" data-field="pred_weight_x" type="range" min="0" max="1" step="0.01"><input data-number-for="pred_weight_x" type="number" min="0" max="1" step="0.01"></div>
       <div class="field"><label for="pred_weight_y">Pred weight Y</label><input id="pred_weight_y" data-field="pred_weight_y" type="range" min="0" max="1" step="0.01"><input data-number-for="pred_weight_y" type="number" min="0" max="1" step="0.01"></div>
+      <div class="field"><label for="noise_amp">Noise amp</label><input id="noise_amp" data-field="noise_amp" type="range" min="0" max="20" step="0.01"><input data-number-for="noise_amp" type="number" min="0" max="20" step="0.01"></div>
+    </section>
+    <section>
+      <h2>Controller</h2>
+      <div class="metric-head"><span>Value</span><span>Now</span><span></span><span></span><span></span></div>
+      <div id="controller-rows"></div>
     </section>
     <section>
       <h2>Aim</h2>
@@ -802,6 +840,7 @@ _HTML = """<!doctype html>
       state.config = data.config;
       state.options = data.options || {};
       renderLatency(data.latency || {});
+      renderController(data.controller || {});
       fillHotkeys();
       renderClasses();
       for (const [field, value] of Object.entries(state.config)) {
@@ -848,6 +887,28 @@ _HTML = """<!doctype html>
         const p95 = latency.p95 || {};
         const max = latency.max || {};
         row.innerHTML = `<span><strong>${label}</strong></span><span>${formatMs(current[key])}</span><span>${formatMs(avg[key])}</span><span>${formatMs(p95[key])}</span><span>${formatMs(max[key])}</span>`;
+        rows.appendChild(row);
+      }
+    }
+
+    function renderController(controller) {
+      const rows = document.querySelector("#controller-rows");
+      if (!rows) return;
+      rows.innerHTML = "";
+      const order = [
+        ["move_x", "Move X"],
+        ["move_y", "Move Y"],
+        ["curve_len", "Curve len"],
+        ["predicted_x", "Pred X"],
+        ["predicted_y", "Pred Y"],
+        ["fused_x", "Fused X"],
+        ["fused_y", "Fused Y"]
+      ];
+      for (const [key, label] of order) {
+        const row = document.createElement("div");
+        row.className = "metric-row";
+        const value = Number(controller[key]);
+        row.innerHTML = `<span><strong>${label}</strong></span><span>${Number.isFinite(value) ? value.toFixed(3) : "--"}</span><span></span><span></span><span></span>`;
         rows.appendChild(row);
       }
     }
@@ -916,6 +977,7 @@ _HTML = """<!doctype html>
       try {
         const data = await request("/api/config");
         renderLatency(data.latency || {});
+        renderController(data.controller || {});
       } catch (_error) {
       }
     }

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
-from .config import AimbotConfigV63
+from .config import AimbotConfigV64
 
 TUNABLE_FIELDS = {
     "selected_class_ids",
@@ -25,6 +25,11 @@ TUNABLE_FIELDS = {
     "pid_integral_gate_enabled",
     "pid_integral_gate_threshold",
     "pid_integral_gate_rate",
+    "stop_brake_enabled",
+    "stop_brake_radius",
+    "stop_brake_output_decay",
+    "stop_brake_pred_decay",
+    "stop_brake_min_output",
     "confidence_threshold",
     "iou_threshold",
     "aim_offset_x",
@@ -70,6 +75,11 @@ CONTROLLER_FIELDS = {
     "pid_integral_gate_enabled",
     "pid_integral_gate_threshold",
     "pid_integral_gate_rate",
+    "stop_brake_enabled",
+    "stop_brake_radius",
+    "stop_brake_output_decay",
+    "stop_brake_pred_decay",
+    "stop_brake_min_output",
 }
 TRACKER_FIELDS = {
     "tracker_generate",
@@ -86,7 +96,7 @@ TRIGGER_BUTTON_OPTIONS = ("left", "right", "side1", "side2")
 class WebTuner:
     def __init__(
         self,
-        config: AimbotConfigV63,
+        config: AimbotConfigV64,
         config_path: str | Path,
         *,
         engine: Optional[Any] = None,
@@ -254,6 +264,11 @@ class WebTuner:
             "pid_integral_gate_enabled": self.config.pid_integral_gate_enabled,
             "pid_integral_gate_threshold": self.config.pid_integral_gate_threshold,
             "pid_integral_gate_rate": self.config.pid_integral_gate_rate,
+            "stop_brake_enabled": self.config.stop_brake_enabled,
+            "stop_brake_radius": self.config.stop_brake_radius,
+            "stop_brake_output_decay": self.config.stop_brake_output_decay,
+            "stop_brake_pred_decay": self.config.stop_brake_pred_decay,
+            "stop_brake_min_output": self.config.stop_brake_min_output,
         }
 
     def _reset_aimbot_tracking_locked(self):
@@ -351,7 +366,7 @@ _HTML = """<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Aimbot V6.3 Tuner</title>
+  <title>Aimbot V6.4 Tuner</title>
   <style>
     :root {
       color-scheme: light;
@@ -587,7 +602,7 @@ _HTML = """<!doctype html>
 </head>
 <body>
   <header>
-    <h1>Aimbot V6.3 Tuner</h1>
+    <h1>Aimbot V6.4 Tuner</h1>
     <div class="actions">
       <button id="reload" type="button">Reload</button>
       <button id="save" type="button">Save config</button>
@@ -630,6 +645,11 @@ _HTML = """<!doctype html>
       <div class="field"><label for="ramp_time">Ramp time</label><input id="ramp_time" data-field="ramp_time" type="range" min="0.001" max="2" step="0.001"><input data-number-for="ramp_time" type="number" min="0.001" max="2" step="0.001"></div>
       <div class="field"><label for="pred_weight_x">Pred weight X</label><input id="pred_weight_x" data-field="pred_weight_x" type="range" min="0" max="1" step="0.01"><input data-number-for="pred_weight_x" type="number" min="0" max="1" step="0.01"></div>
       <div class="field"><label for="pred_weight_y">Pred weight Y</label><input id="pred_weight_y" data-field="pred_weight_y" type="range" min="0" max="1" step="0.01"><input data-number-for="pred_weight_y" type="number" min="0" max="1" step="0.01"></div>
+      <div class="field check"><label for="stop_brake_enabled">Stop brake</label><input id="stop_brake_enabled" data-field="stop_brake_enabled" type="checkbox"></div>
+      <div class="field"><label for="stop_brake_radius">Stop radius</label><input id="stop_brake_radius" data-field="stop_brake_radius" type="range" min="0" max="80" step="0.1"><input data-number-for="stop_brake_radius" type="number" min="0" max="80" step="0.1"></div>
+      <div class="field"><label for="stop_brake_output_decay">Output decay</label><input id="stop_brake_output_decay" data-field="stop_brake_output_decay" type="range" min="0" max="1" step="0.01"><input data-number-for="stop_brake_output_decay" type="number" min="0" max="1" step="0.01"></div>
+      <div class="field"><label for="stop_brake_pred_decay">Pred decay</label><input id="stop_brake_pred_decay" data-field="stop_brake_pred_decay" type="range" min="0" max="1" step="0.01"><input data-number-for="stop_brake_pred_decay" type="number" min="0" max="1" step="0.01"></div>
+      <div class="field"><label for="stop_brake_min_output">Brake trigger output</label><input id="stop_brake_min_output" data-field="stop_brake_min_output" type="range" min="0" max="200" step="0.1"><input data-number-for="stop_brake_min_output" type="number" min="0" max="200" step="0.1"></div>
     </section>
     <section>
       <h2>Aim</h2>

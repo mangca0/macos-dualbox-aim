@@ -1,10 +1,11 @@
 import math
+import random
 import time
 from collections import deque
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from .config import AimbotConfigV63
+from .config import AimbotConfigV7
 from .crosshair import CrosshairDetector
 from .tracker import BoundingBox, DetectionObject, KalmanP
 from ..core.kmbox import KmboxConfig, KmboxNet, SUCCESS
@@ -21,7 +22,7 @@ class IncrementalPid:
         self.kp = float(kp)
         self.ki = float(ki)
         self.kd = float(kd)
-        self.integral_gate_enabled = True
+        self.integral_gate_enabled = False
         self.integral_gate_threshold = 50.0
         self.integral_gate_rate = 0.025
         self.integral_gain = 0.0
@@ -91,6 +92,33 @@ class IncrementalPid:
         return self.integral_gain
 
 
+class PerlinNoise1D:
+    """One-dimensional smooth value noise used by the learning controller."""
+
+    TABLE_SIZE = 256
+
+    def __init__(self, seed=0):
+        rng = random.Random(int(seed))
+        self.values = [rng.random() for _ in range(self.TABLE_SIZE)]
+
+    @staticmethod
+    def _fade(t):
+        return t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
+
+    @staticmethod
+    def _lerp(a, b, t):
+        return a + (b - a) * t
+
+    def noise(self, x):
+        floor_x = math.floor(float(x))
+        xi = int(floor_x) & 255
+        xf = float(x) - floor_x
+        u = self._fade(xf)
+        a = self.values[xi]
+        b = self.values[(xi + 1) & 255]
+        return self._lerp(a, b, u) * 2.0 - 1.0
+
+
 class DerivativePredictor:
     """Motion predictor based on smoothed velocity and acceleration estimates."""
 
@@ -148,81 +176,100 @@ class DerivativePredictor:
         )
 
 
-class PIDController:
-    """Learned predictive PID controller: prediction fusion plus smoothstep ramp."""
+@dataclass
+class AimOutput:
+    move_x: float
+    move_y: float
+    curve_len: float
+    predicted_x: float
+    predicted_y: float
+    fused_x: float
+    fused_y: float
 
-    def __init__(
-        self,
-        kp,
-        ki,
-        kd,
-        slew_limit=40.0,
-        max_speed=30.0,
-        sensitivity=1.0,
-        fov_radius=256,
-        init_scale=0.6,
-        ramp_time=0.5,
-        pred_weight_x=0.5,
-        pred_weight_y=0.5,
-        target_jump_reset=40.0,
-        pid_integral_gate_enabled=True,
-        pid_integral_gate_threshold=50.0,
-        pid_integral_gate_rate=0.025,
-        **_ignored,
-    ):
-        self._base_kp = float(kp)
-        self._base_ki = float(ki)
-        self._base_kd = float(kd)
-        self._pid_x = IncrementalPid(kp, ki, kd)
-        self._pid_y = IncrementalPid(kp, ki, kd)
-        self.slew_limit = float(slew_limit)
-        self.max_speed = max(1.0, float(max_speed))
-        self.sensitivity = max(0.01, float(sensitivity))
-        self.fov_radius = int(fov_radius)
-        self.init_scale = max(0.05, min(1.0, float(init_scale)))
-        self.ramp_time = max(0.001, float(ramp_time))
-        self.pred_weight_x = max(0.0, min(1.0, float(pred_weight_x)))
-        self.pred_weight_y = max(0.0, min(1.0, float(pred_weight_y)))
-        self.target_jump_reset = max(0.0, float(target_jump_reset))
-        self._configure_integral_gates(
-            enabled=pid_integral_gate_enabled,
-            threshold=pid_integral_gate_threshold,
-            rate=pid_integral_gate_rate,
-        )
 
-        self._predictor = DerivativePredictor()
-        self._last_raw_x = 0.0
-        self._last_raw_y = 0.0
-        self._last_output_x = 0.0
-        self._last_output_y = 0.0
-        self._last_time = None
-        self._lock_start_time = None
+class AimController:
+    """Strict Python replica of the learning project's aim controller."""
+
+    def __init__(self):
+        self.pid_x = IncrementalPid()
+        self.pid_y = IncrementalPid()
+        self.last_raw_x = 0.0
+        self.last_raw_y = 0.0
+        self.last_output_x = 0.0
+        self.last_output_y = 0.0
+        self.last_time = time.monotonic()
+        self.lock_start_time = time.monotonic()
+        self.noise_x = PerlinNoise1D(12345)
+        self.noise_y = PerlinNoise1D(54321)
+        self.noise_time_x = 0.0
+        self.noise_time_y = 100.0
+        self.predictor = DerivativePredictor()
+        self.latest_output = AimOutput(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+        self.slew_limit = 40.0
+        self.output_max = 30.0
+        self.sensitivity = 1.0
+        self.fov_radius = 256
+        self.init_scale = 0.6
+        self.ramp_time = 0.5
+        self.pred_weight_x = 0.5
+        self.pred_weight_y = 0.5
+        self.target_jump_reset = 40.0
+        self.noise_amp = 0.0
+
+    def reset(self):
+        self.pid_x.reset()
+        self.pid_y.reset()
+        self.last_raw_x = 0.0
+        self.last_raw_y = 0.0
+        self.last_output_x = 0.0
+        self.last_output_y = 0.0
+        self.last_time = time.monotonic()
+        self.lock_start_time = time.monotonic()
+        self.noise_time_x = 0.0
+        self.noise_time_y = 100.0
+        self.predictor.reset()
+        self.latest_output = AimOutput(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+    def configure_pid(self, kp, ki, kd):
+        self.pid_x.configure(kp, ki, kd)
+        self.pid_y.configure(kp, ki, kd)
+
+    def configure_pid_x(self, kp, ki, kd):
+        self.pid_x.configure(kp, ki, kd)
+
+    def configure_pid_y(self, kp, ki, kd):
+        self.pid_y.configure(kp, ki, kd)
+
+    def set_output_limits(self, min_val, max_val):
+        self.pid_x.set_output_limits(min_val, max_val)
+        self.pid_y.set_output_limits(min_val, max_val)
+
+    def configure_integral_gate(self, enabled=None, threshold=None, rate=None):
+        self.pid_x.configure_integral_gate(enabled=enabled, threshold=threshold, rate=rate)
+        self.pid_y.configure_integral_gate(enabled=enabled, threshold=threshold, rate=rate)
 
     def update_params(self, **kwargs):
         kp = kwargs.get("kp")
         ki = kwargs.get("ki")
         kd = kwargs.get("kd")
         if kp is not None or ki is not None or kd is not None:
-            if kp is not None:
-                self._base_kp = float(kp)
-            if ki is not None:
-                self._base_ki = float(ki)
-            if kd is not None:
-                self._base_kd = float(kd)
-            self._pid_x.configure(
-                float(kp if kp is not None else self._base_kp),
-                float(ki if ki is not None else self._base_ki),
-                float(kd if kd is not None else self._base_kd),
+            self.pid_x.configure(
+                self.pid_x.kp if kp is None else float(kp),
+                self.pid_x.ki if ki is None else float(ki),
+                self.pid_x.kd if kd is None else float(kd),
             )
-            self._pid_y.configure(
-                float(kp if kp is not None else self._base_kp),
-                float(ki if ki is not None else self._base_ki),
-                float(kd if kd is not None else self._base_kd),
+            self.pid_y.configure(
+                self.pid_y.kp if kp is None else float(kp),
+                self.pid_y.ki if ki is None else float(ki),
+                self.pid_y.kd if kd is None else float(kd),
             )
         if kwargs.get("slew_limit") is not None:
             self.slew_limit = float(kwargs["slew_limit"])
-        if kwargs.get("max_speed") is not None:
-            self.max_speed = max(1.0, float(kwargs["max_speed"]))
+        if kwargs.get("max_speed") is not None and kwargs.get("output_max") is None:
+            self.output_max = max(1.0, float(kwargs["max_speed"]))
+        if kwargs.get("output_max") is not None:
+            self.output_max = max(1.0, float(kwargs["output_max"]))
         if kwargs.get("sensitivity") is not None:
             self.sensitivity = max(0.01, float(kwargs["sensitivity"]))
         if kwargs.get("fov_radius") is not None:
@@ -242,7 +289,7 @@ class PIDController:
             or kwargs.get("pid_integral_gate_threshold") is not None
             or kwargs.get("pid_integral_gate_rate") is not None
         ):
-            self._configure_integral_gates(
+            self.configure_integral_gate(
                 enabled=kwargs.get("pid_integral_gate_enabled"),
                 threshold=kwargs.get("pid_integral_gate_threshold"),
                 rate=kwargs.get("pid_integral_gate_rate"),
@@ -253,35 +300,10 @@ class PIDController:
             pw = max(0.0, min(1.0, float(pw)))
             self.pred_weight_x = pw
             self.pred_weight_y = pw
+        if kwargs.get("noise_amp") is not None:
+            self.noise_amp = max(0.0, float(kwargs["noise_amp"]))
 
-    def _configure_integral_gates(self, enabled=None, threshold=None, rate=None):
-        self._pid_x.configure_integral_gate(enabled=enabled, threshold=threshold, rate=rate)
-        self._pid_y.configure_integral_gate(enabled=enabled, threshold=threshold, rate=rate)
-
-    def reset(self):
-        self._pid_x.reset()
-        self._pid_y.reset()
-        self._predictor.reset()
-        self._last_raw_x = 0.0
-        self._last_raw_y = 0.0
-        self._last_output_x = 0.0
-        self._last_output_y = 0.0
-        self._last_time = None
-        self._lock_start_time = None
-
-    @staticmethod
-    def _trunc_to_int(value):
-        return int(value)
-
-    def _smoothstep_ramp_scale(self, now):
-        if self._lock_start_time is None:
-            return self.init_scale
-        elapsed = now - self._lock_start_time
-        progress = _clamp(elapsed / self.ramp_time, 0.0, 1.0)
-        ramp = progress * progress * (3.0 - 2.0 * progress)
-        return self.init_scale + (1.0 - self.init_scale) * ramp
-
-    def update(self, current_x, current_y, target_x, target_y):
+    def update_runtime(self, current_x, current_y, target_x, target_y):
         raw_x = float(target_x) - float(current_x)
         raw_y = float(target_y) - float(current_y)
         dist0 = math.hypot(raw_x, raw_y)
@@ -289,22 +311,53 @@ class PIDController:
             self.reset()
             return 0.0, 0.0
 
+        output = self.update(
+            raw_x,
+            raw_y,
+            self.pred_weight_x,
+            self.pred_weight_y,
+            self.init_scale,
+            self.ramp_time,
+            self.output_max,
+            self.noise_amp,
+        )
+        out_x = output.move_x * self.sensitivity
+        out_y = output.move_y * self.sensitivity
+        self.latest_output = AimOutput(
+            out_x,
+            out_y,
+            output.curve_len,
+            output.predicted_x,
+            output.predicted_y,
+            output.fused_x,
+            output.fused_y,
+        )
+        return float(int(out_x)), float(int(out_y))
+
+    def update(
+        self,
+        raw_x,
+        raw_y,
+        pred_weight_x,
+        pred_weight_y,
+        init_scale,
+        ramp_time,
+        output_max,
+        noise_amp,
+    ):
         now = time.monotonic()
-        if self._last_time is None:
-            dt = 0.001
-        else:
-            dt = _clamp(now - self._last_time, 0.001, 0.05)
-        self._last_time = now
+        dt = _clamp(now - self.last_time, 0.001, 0.05)
+        self.last_time = now
 
-        target_jump = math.hypot(raw_x - self._last_raw_x, raw_y - self._last_raw_y)
-        if self._lock_start_time is None or (self.target_jump_reset > 0.0 and target_jump > self.target_jump_reset):
-            self._lock_start_time = now
-            self._predictor.reset()
-            self._pid_x.reset()
-            self._pid_y.reset()
+        target_jump = math.hypot(raw_x - self.last_raw_x, raw_y - self.last_raw_y)
+        if self.target_jump_reset > 0.0 and target_jump > self.target_jump_reset:
+            self.lock_start_time = now
+            self.predictor.reset()
+            self.pid_x.reset()
+            self.pid_y.reset()
 
-        pred_x, pred_y = self._predictor.predict(
-            raw_x, raw_y, self._last_output_x, self._last_output_y, dt,
+        pred_x, pred_y = self.predictor.predict(
+            raw_x, raw_y, self.last_output_x, self.last_output_y, dt,
         )
 
         pred_limit_x = min(max(abs(raw_x) * 1.5, 30.0), 60.0)
@@ -313,29 +366,43 @@ class PIDController:
         pred_y = _clamp(pred_y, -pred_limit_y, pred_limit_y)
 
         if abs(pred_x) > 100.0 or abs(pred_y) > 100.0:
-            self._predictor.reset()
+            self.predictor.reset()
             pred_x = pred_y = 0.0
 
-        fused_x = raw_x + pred_x * self.pred_weight_x
-        fused_y = raw_y + pred_y * self.pred_weight_y
+        fused_x = raw_x + pred_x * float(pred_weight_x)
+        fused_y = raw_y + pred_y * float(pred_weight_y)
 
-        scale = self._smoothstep_ramp_scale(now)
-        out_x = self._pid_x.update(fused_x, scale)
-        out_y = self._pid_y.update(fused_y, scale)
+        elapsed = now - self.lock_start_time
+        progress = _clamp(elapsed / max(float(ramp_time), 0.001), 0.0, 1.0)
+        ramp = progress * progress * (3.0 - 2.0 * progress)
+        scale = float(init_scale) + (1.0 - float(init_scale)) * ramp
 
-        cap = self.max_speed
-        out_x = _clamp(out_x, -cap, cap)
-        out_y = _clamp(out_y, -cap, cap)
+        out_x = self.pid_x.update(fused_x, scale)
+        out_y = self.pid_y.update(fused_y, scale)
 
-        out_x *= self.sensitivity
-        out_y *= self.sensitivity
+        self.noise_time_x += dt * 5.0
+        self.noise_time_y += dt * 5.0
+        out_x += self.noise_x.noise(self.noise_time_x) * float(noise_amp)
+        out_y += self.noise_y.noise(self.noise_time_y) * float(noise_amp)
 
-        self._last_raw_x = raw_x
-        self._last_raw_y = raw_y
-        self._last_output_x = out_x
-        self._last_output_y = out_y
+        out_x = _clamp(out_x, -float(output_max), float(output_max))
+        out_y = _clamp(out_y, -float(output_max), float(output_max))
 
-        return float(self._trunc_to_int(out_x)), float(self._trunc_to_int(out_y))
+        self.last_raw_x = raw_x
+        self.last_raw_y = raw_y
+        self.last_output_x = out_x
+        self.last_output_y = out_y
+
+        self.latest_output = AimOutput(
+            out_x,
+            out_y,
+            math.hypot(fused_x, fused_y),
+            pred_x,
+            pred_y,
+            fused_x,
+            fused_y,
+        )
+        return self.latest_output
 
 
 @dataclass
@@ -368,17 +435,19 @@ def _mean(values: List[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
-class AimbotV63:
-    def __init__(self, config: AimbotConfigV63):
+class AimbotV7:
+    def __init__(self, config: AimbotConfigV7):
         self.config = config
         self.selected_class_ids = set(config.selected_class_ids or [])
         self.tracker = self._new_tracker()
         self.crosshair_detector = CrosshairDetector(config)
-        self.controller = PIDController(
+        self.controller = AimController()
+        self.controller.update_params(
             kp=config.pid_kp,
             ki=config.pid_ki,
             kd=config.pid_kd,
             slew_limit=config.slew_limit,
+            output_max=config.output_max,
             max_speed=config.max_speed,
             sensitivity=config.sensitivity,
             fov_radius=config.fov_radius,
@@ -390,7 +459,9 @@ class AimbotV63:
             pid_integral_gate_enabled=config.pid_integral_gate_enabled,
             pid_integral_gate_threshold=config.pid_integral_gate_threshold,
             pid_integral_gate_rate=config.pid_integral_gate_rate,
+            noise_amp=config.noise_amp,
         )
+        self.latest_aim_output = self.controller.latest_output
         self.kmbox: Optional[KmboxNet] = None
         self.active = False
         self.stats = {
@@ -634,7 +705,8 @@ class AimbotV63:
             return False
 
         pid_start = time.perf_counter()
-        move_x, move_y = self.controller.update(0.0, 0.0, target.aim_x, target.aim_y)
+        move_x, move_y = self.controller.update_runtime(0.0, 0.0, target.aim_x, target.aim_y)
+        self.latest_aim_output = self.controller.latest_output
         if timing_ms is not None:
             timing_ms["pid_ms"] = (time.perf_counter() - pid_start) * 1000.0
         out_x = int(move_x)

@@ -5,17 +5,18 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 
-from macos_dualbox_aim.v63 import AIMBOT_V63_VERSION, AimbotConfigV63, AimbotV63
+from macos_dualbox_aim.v64 import AIMBOT_V64_VERSION, AimbotConfigV64, AimbotV64
 from macos_dualbox_aim.core import HotkeyConfig, HotkeyMonitor
-from macos_dualbox_aim.v63.crosshair import CrosshairDetector
-from macos_dualbox_aim.v63.tuner import TUNABLE_FIELDS, WebTuner, _HTML
+from macos_dualbox_aim.v64.controller import PIDController
+from macos_dualbox_aim.v64.crosshair import CrosshairDetector
+from macos_dualbox_aim.v64.tuner import TUNABLE_FIELDS, WebTuner, _HTML
 
 
 def _load_script_module():
     import importlib.util
 
-    script_path = Path(__file__).resolve().parent.parent / "scripts" / "main_v63.py"
-    spec = importlib.util.spec_from_file_location("main_v63", script_path)
+    script_path = Path(__file__).resolve().parent.parent / "scripts" / "main_v64.py"
+    spec = importlib.util.spec_from_file_location("main_v64", script_path)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(module)
@@ -25,8 +26,8 @@ def _load_script_module():
 def _load_auto_tune_module():
     import importlib.util
 
-    script_path = Path(__file__).resolve().parent.parent / "scripts" / "auto_tune_v63.py"
-    spec = importlib.util.spec_from_file_location("auto_tune_v63", script_path)
+    script_path = Path(__file__).resolve().parent.parent / "scripts" / "auto_tune_v64.py"
+    spec = importlib.util.spec_from_file_location("auto_tune_v64", script_path)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(module)
@@ -42,17 +43,18 @@ class FakeKmbox:
         return 0
 
 
-class V63ClassAwareTunerTests(unittest.TestCase):
-    def test_v63_config_defaults_include_selectable_classes(self):
-        config = AimbotConfigV63()
+class V64ClassAwareTunerTests(unittest.TestCase):
+    def test_v64_config_defaults_include_selectable_classes(self):
+        config = AimbotConfigV64()
 
-        self.assertEqual(config.version, AIMBOT_V63_VERSION)
+        self.assertEqual(config.version, AIMBOT_V64_VERSION)
         self.assertEqual(config.class_names, ["class_0", "class_1", "class_2", "class_3"])
         self.assertEqual(config.selected_class_ids, [0, 1, 2, 3])
         self.assertTrue(config.crosshair_enabled)
+        self.assertTrue(config.stop_brake_enabled)
 
     def test_crosshair_detector_finds_green_centroid_in_center_crop(self):
-        config = AimbotConfigV63(
+        config = AimbotConfigV64(
             crosshair_enabled=True,
             crosshair_use_hsv=False,
             crosshair_target_r=0,
@@ -76,7 +78,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         self.assertAlmostEqual(result.offset_y, -1.0)
 
     def test_crosshair_detector_handles_default_radius_without_python_pixel_loop_cost(self):
-        config = AimbotConfigV63(
+        config = AimbotConfigV64(
             crosshair_enabled=True,
             crosshair_use_hsv=True,
             crosshair_search_radius=80,
@@ -94,8 +96,8 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         self.assertTrue(result.found)
         self.assertLess(elapsed_ms, 100.0)
 
-    def test_v63_filters_out_unselected_detection_classes(self):
-        config = AimbotConfigV63(
+    def test_v64_filters_out_unselected_detection_classes(self):
+        config = AimbotConfigV64(
             screen_width=100,
             screen_height=100,
             fov_width=40,
@@ -126,7 +128,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
             crosshair_search_radius=12,
             crosshair_min_pixels=1,
         )
-        aimbot = AimbotV63(config)
+        aimbot = AimbotV64(config)
         aimbot.kmbox = FakeKmbox()
         aimbot.activate()
 
@@ -156,8 +158,8 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         self.assertIsNone(accepted_first)
         self.assertIsNotNone(accepted_second)
 
-    def test_v63_allows_empty_selected_classes_and_returns_no_target(self):
-        config = AimbotConfigV63(
+    def test_v64_allows_empty_selected_classes_and_returns_no_target(self):
+        config = AimbotConfigV64(
             screen_width=100,
             screen_height=100,
             fov_width=40,
@@ -179,7 +181,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
             crosshair_search_radius=12,
             crosshair_min_pixels=1,
         )
-        aimbot = AimbotV63(config)
+        aimbot = AimbotV64(config)
 
         frame = np.zeros((40, 40, 3), dtype=np.uint8)
         frame[20, 20] = [0, 255, 0]
@@ -199,9 +201,9 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         ), [])
         self.assertIsNone(target)
 
-    def test_v63_main_loads_class_info_from_model_inspection(self):
+    def test_v64_main_loads_class_info_from_model_inspection(self):
         module = _load_script_module()
-        config = AimbotConfigV63(
+        config = AimbotConfigV64(
             model_path="models/converted/cs2_fp16_fp16_fast.mlpackage",
             class_count=99,
             class_names=[f"class_{index}" for index in range(99)],
@@ -210,7 +212,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
 
         with (
             patch.object(module, "inspect_coreml_model_classes") as inspect_classes,
-            patch.object(module, "RealtimeInferenceV63") as engine_cls,
+            patch.object(module, "RealtimeInferenceV64") as engine_cls,
         ):
             inspect_classes.return_value = Mock(
                 class_count=2,
@@ -223,9 +225,9 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         self.assertEqual(config.selected_class_ids, [])
         self.assertEqual(engine_cls.call_args.kwargs["class_count"], 2)
 
-    def test_v63_main_passes_detection_frame_to_aimbot_update(self):
+    def test_v64_main_passes_detection_frame_to_aimbot_update(self):
         module = _load_script_module()
-        config = AimbotConfigV63(enable_tuner=False)
+        config = AimbotConfigV64(enable_tuner=False)
         aimbot = Mock()
         engine = Mock()
         engine.crop_offset = (10, 20)
@@ -238,7 +240,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
 
         with (
             patch.object(module, "load_config", return_value=config),
-            patch.object(module, "AimbotV63", return_value=aimbot),
+            patch.object(module, "AimbotV64", return_value=aimbot),
             patch.object(module, "HotkeyMonitor", return_value=hotkey),
             patch.object(module, "build_engine", return_value=engine),
             patch("builtins.print"),
@@ -258,35 +260,35 @@ class V63ClassAwareTunerTests(unittest.TestCase):
             frame=result.frame,
         )
 
-    def test_v63_tuner_exposes_class_selection_fields(self):
-        config = AimbotConfigV63(class_count=2, class_names=["enemy", "teammate"], selected_class_ids=[0])
-        tuner = WebTuner(config, Path("/tmp/config_v63.json"))
+    def test_v64_tuner_exposes_class_selection_fields(self):
+        config = AimbotConfigV64(class_count=2, class_names=["enemy", "teammate"], selected_class_ids=[0])
+        tuner = WebTuner(config, Path("/tmp/config_v64.json"))
         snapshot = tuner.snapshot()
 
         self.assertIn("selected_class_ids", TUNABLE_FIELDS)
         self.assertEqual(snapshot["options"]["classes"][0]["name"], "enemy")
         self.assertEqual(snapshot["config"]["selected_class_ids"], [0])
-        self.assertIn("<title>Aimbot V6.3 Tuner</title>", _HTML)
+        self.assertIn("<title>Aimbot V6.4 Tuner</title>", _HTML)
         self.assertIn('id="class-list"', _HTML)
 
-    def test_v63_tuner_applies_selected_classes_to_runtime(self):
-        config = AimbotConfigV63(class_count=2, class_names=["enemy", "teammate"], selected_class_ids=[0])
+    def test_v64_tuner_applies_selected_classes_to_runtime(self):
+        config = AimbotConfigV64(class_count=2, class_names=["enemy", "teammate"], selected_class_ids=[0])
         aimbot = Mock()
-        tuner = WebTuner(config, Path("/tmp/config_v63.json"), aimbot=aimbot)
+        tuner = WebTuner(config, Path("/tmp/config_v64.json"), aimbot=aimbot)
 
         tuner.update_config({"selected_class_ids": [1]})
 
         aimbot.update_selected_classes.assert_called_once_with([1])
 
-    def test_v63_tuner_hot_updates_speed_and_integral_gate_params(self):
-        config = AimbotConfigV63(
+    def test_v64_tuner_hot_updates_speed_and_integral_gate_params(self):
+        config = AimbotConfigV64(
             max_speed=30.0,
             pid_integral_gate_threshold=50.0,
             pid_integral_gate_rate=0.025,
         )
         aimbot = Mock()
         aimbot.controller = Mock()
-        tuner = WebTuner(config, Path("/tmp/config_v63.json"), aimbot=aimbot)
+        tuner = WebTuner(config, Path("/tmp/config_v64.json"), aimbot=aimbot)
 
         tuner.update_config({
             "max_speed": 123.0,
@@ -299,11 +301,62 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         self.assertEqual(kwargs["pid_integral_gate_threshold"], 77.0)
         self.assertEqual(kwargs["pid_integral_gate_rate"], 0.4)
 
-    def test_v63_tuner_hidden_aim_active_control_is_not_in_html(self):
-        config = AimbotConfigV63()
+    def test_v64_tuner_hot_updates_stop_brake_params(self):
+        config = AimbotConfigV64(
+            stop_brake_radius=14.0,
+            stop_brake_output_decay=0.4,
+            stop_brake_pred_decay=0.25,
+        )
+        aimbot = Mock()
+        aimbot.controller = Mock()
+        tuner = WebTuner(config, Path("/tmp/config_v64.json"), aimbot=aimbot)
+
+        tuner.update_config({
+            "stop_brake_enabled": False,
+            "stop_brake_radius": 22.0,
+            "stop_brake_output_decay": 0.2,
+            "stop_brake_pred_decay": 0.1,
+        })
+
+        kwargs = aimbot.controller.update_params.call_args.kwargs
+        self.assertFalse(kwargs["stop_brake_enabled"])
+        self.assertEqual(kwargs["stop_brake_radius"], 22.0)
+        self.assertEqual(kwargs["stop_brake_output_decay"], 0.2)
+        self.assertEqual(kwargs["stop_brake_pred_decay"], 0.1)
+
+    def test_v64_controller_brakes_high_output_when_target_suddenly_stops_near_crosshair(self):
+        controller = PIDController(
+            kp=0.45,
+            ki=0.0,
+            kd=0.0,
+            max_speed=200.0,
+            sensitivity=1.0,
+            fov_radius=320,
+            init_scale=1.0,
+            ramp_time=0.001,
+            pred_weight_x=0.0,
+            pred_weight_y=0.0,
+            target_jump_reset=0.0,
+            pid_integral_gate_enabled=False,
+            stop_brake_enabled=True,
+            stop_brake_radius=18.0,
+            stop_brake_output_decay=0.25,
+            stop_brake_pred_decay=0.2,
+            stop_brake_min_output=20.0,
+        )
+
+        controller.update(0.0, 0.0, 180.0, 0.0)
+        fast_move, _ = controller.update(0.0, 0.0, 180.0, 0.0)
+        stopped_move, _ = controller.update(0.0, 0.0, 8.0, 0.0)
+
+        self.assertGreater(abs(fast_move), 70.0)
+        self.assertLess(abs(stopped_move), 25.0)
+
+    def test_v64_tuner_hidden_aim_active_control_is_not_in_html(self):
+        config = AimbotConfigV64()
         aimbot = Mock()
         aimbot.is_active.return_value = False
-        tuner = WebTuner(config, Path("/tmp/config_v63.json"), aimbot=aimbot)
+        tuner = WebTuner(config, Path("/tmp/config_v64.json"), aimbot=aimbot)
 
         activated = tuner.set_aim_active(True)
         deactivated = tuner.set_aim_active(False)
@@ -314,11 +367,11 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         self.assertIn("aim_active", deactivated)
         self.assertNotIn("/api/aim/active", _HTML)
 
-    def test_v63_tuner_aim_active_control_uses_hotkey_override_when_available(self):
-        config = AimbotConfigV63()
+    def test_v64_tuner_aim_active_control_uses_hotkey_override_when_available(self):
+        config = AimbotConfigV64()
         aimbot = Mock()
         hotkey = Mock()
-        tuner = WebTuner(config, Path("/tmp/config_v63.json"), hotkey=hotkey, aimbot=aimbot)
+        tuner = WebTuner(config, Path("/tmp/config_v64.json"), hotkey=hotkey, aimbot=aimbot)
 
         tuner.set_aim_active(True)
         tuner.set_aim_active(False)
@@ -338,7 +391,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         self.assertGreaterEqual(aimbot.on_activate.call_count, 1)
         aimbot.on_deactivate.assert_called_once_with()
 
-    def test_auto_tune_v63_client_posts_hidden_active_state(self):
+    def test_auto_tune_v64_client_posts_hidden_active_state(self):
         module = _load_auto_tune_module()
         client = module.TunerClient("http://example.invalid")
 
@@ -348,8 +401,8 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         request.assert_called_once_with("POST", "/api/aim/active", {"active": True})
         self.assertEqual(result, {"aim_active": True})
 
-    def test_v63_records_aim_metrics_for_target_and_misses(self):
-        config = AimbotConfigV63(
+    def test_v64_records_aim_metrics_for_target_and_misses(self):
+        config = AimbotConfigV64(
             screen_width=100,
             screen_height=100,
             fov_width=40,
@@ -377,7 +430,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
             crosshair_search_radius=12,
             crosshair_min_pixels=1,
         )
-        aimbot = AimbotV63(config)
+        aimbot = AimbotV64(config)
         aimbot.kmbox = FakeKmbox()
         aimbot.activate()
 
@@ -403,11 +456,11 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         self.assertIn("time_to_x_settle_ms", metrics)
         self.assertGreater(metrics["mean_move"], 0.0)
 
-    def test_v63_tuner_exposes_and_resets_aim_metrics(self):
-        config = AimbotConfigV63()
+    def test_v64_tuner_exposes_and_resets_aim_metrics(self):
+        config = AimbotConfigV64()
         aimbot = Mock()
         aimbot.get_aim_metrics_snapshot.return_value = {"available": True, "samples": 3}
-        tuner = WebTuner(config, Path("/tmp/config_v63.json"), aimbot=aimbot)
+        tuner = WebTuner(config, Path("/tmp/config_v64.json"), aimbot=aimbot)
 
         snapshot = tuner.snapshot()
         reset = tuner.reset_aim_metrics()
@@ -416,7 +469,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         aimbot.reset_aim_metrics.assert_called_once_with()
         self.assertEqual(reset["aim"], {"available": True, "samples": 3})
 
-    def test_auto_tune_v63_fields_exclude_non_controller_surfaces(self):
+    def test_auto_tune_v64_fields_exclude_non_controller_surfaces(self):
         module = _load_auto_tune_module()
         excluded = {
             "selected_class_ids",
@@ -448,11 +501,12 @@ class V63ClassAwareTunerTests(unittest.TestCase):
             "crosshair_target_g",
             "crosshair_target_b",
             "crosshair_color_tolerance",
+            "stop_brake_enabled",
         }
 
         self.assertFalse(excluded & set(module.AUTOTUNE_FIELDS))
 
-    def test_auto_tune_v63_scores_penalize_loss_and_oscillation(self):
+    def test_auto_tune_v64_scores_penalize_loss_and_oscillation(self):
         module = _load_auto_tune_module()
         stable = {
             "available": True,
@@ -477,7 +531,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
 
         self.assertLess(module.score_metrics(stable), module.score_metrics(unstable))
 
-    def test_auto_tune_v63_score_prefers_strict_x_centering(self):
+    def test_auto_tune_v64_score_prefers_strict_x_centering(self):
         module = _load_auto_tune_module()
         centered = {
             "available": True,
@@ -504,7 +558,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
 
         self.assertLess(module.score_metrics(centered), module.score_metrics(horizontally_off_center))
 
-    def test_auto_tune_v63_score_prefers_x_dwell_and_low_bias(self):
+    def test_auto_tune_v64_score_prefers_x_dwell_and_low_bias(self):
         module = _load_auto_tune_module()
         stable_center = {
             "available": True,
@@ -538,7 +592,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
 
         self.assertLess(module.score_metrics(stable_center), module.score_metrics(biased_and_twitchy))
 
-    def test_auto_tune_v63_combo_candidates_change_grouped_fields(self):
+    def test_auto_tune_v64_combo_candidates_change_grouped_fields(self):
         module = _load_auto_tune_module()
         config = {
             "pid_kp": 0.6,
@@ -553,6 +607,10 @@ class V63ClassAwareTunerTests(unittest.TestCase):
             "target_jump_reset": 90.0,
             "pid_integral_gate_threshold": 24.0,
             "pid_integral_gate_rate": 0.3,
+            "stop_brake_radius": 18.0,
+            "stop_brake_output_decay": 0.35,
+            "stop_brake_pred_decay": 0.2,
+            "stop_brake_min_output": 35.0,
         }
 
         candidates = module.generate_combo_candidates(
@@ -572,7 +630,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
                 self.assertGreaterEqual(value, spec.minimum)
                 self.assertLessEqual(value, spec.maximum)
 
-    def test_auto_tune_v63_mixed_combo_candidate_changes_cross_group_fields(self):
+    def test_auto_tune_v64_mixed_combo_candidate_changes_cross_group_fields(self):
         module = _load_auto_tune_module()
         config = {field: 1.0 for field in module.AUTOTUNE_FIELDS}
 
@@ -593,7 +651,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         self.assertGreaterEqual(len(touched_groups), 2)
         self.assertTrue(set(candidate) <= set(module.AUTOTUNE_FIELDS))
 
-    def test_auto_tune_v63_auto_iteration_candidates_mix_search_modes(self):
+    def test_auto_tune_v64_auto_iteration_candidates_mix_search_modes(self):
         module = _load_auto_tune_module()
         config = {field: 1.0 for field in module.AUTOTUNE_FIELDS}
 
@@ -611,7 +669,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         for _label, candidate in candidates:
             self.assertTrue(set(candidate) <= set(module.AUTOTUNE_FIELDS))
 
-    def test_auto_tune_v63_boundary_candidates_include_speed_and_integral_gate_fields(self):
+    def test_auto_tune_v64_boundary_candidates_include_speed_and_integral_gate_fields(self):
         module = _load_auto_tune_module()
         config = {field: 1.0 for field in module.AUTOTUNE_FIELDS}
         config.update({
@@ -629,7 +687,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         self.assertTrue(any(value < 1.0 for value in rate_values))
         self.assertTrue({"max_speed", "pid_integral_gate_threshold", "pid_integral_gate_rate"} <= set(module.AUTOTUNE_FIELDS))
 
-    def test_auto_tune_v63_evaluate_trial_uses_median_repeat_score(self):
+    def test_auto_tune_v64_evaluate_trial_uses_median_repeat_score(self):
         module = _load_auto_tune_module()
         args = Mock(warmup=0.0, duration=0.01, min_samples=1, repeats=3, fail_fast=True)
 
@@ -647,7 +705,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         self.assertEqual(trial["repeat_scores"], [90.0, 10.0, 50.0])
         self.assertEqual(trial["metrics"]["mean_abs_x_error"], 5.0)
 
-    def test_auto_tune_v63_combo_stage_accepts_whole_candidate_group(self):
+    def test_auto_tune_v64_combo_stage_accepts_whole_candidate_group(self):
         module = _load_auto_tune_module()
 
         class FakeClient:
@@ -715,7 +773,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
             patch.object(module, "run_trial", side_effect=[{"available": True}, {"available": True}, {"available": True}]),
             patch.object(module, "score_metrics", side_effect=[100.0, 80.0, 75.0]),
             patch.object(module, "write_record"),
-            patch.object(module, "_new_output_path", return_value=Path("/tmp/v63_auto_tune_test.jsonl")),
+            patch.object(module, "_new_output_path", return_value=Path("/tmp/v64_auto_tune_test.jsonl")),
             patch("builtins.print"),
         ):
             result = module.run_search(args)
@@ -727,7 +785,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         self.assertIn({"pid_kp": 0.7, "pid_kd": 0.25}, fake_client.updates)
         self.assertEqual(fake_client.updates[-1]["pid_kp"], 0.7)
 
-    def test_auto_tune_v63_adaptive_iterations_stop_after_plateau(self):
+    def test_auto_tune_v64_adaptive_iterations_stop_after_plateau(self):
         module = _load_auto_tune_module()
 
         class FakeClient:
@@ -772,7 +830,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
             result = module.run_auto_iterations(
                 FakeClient(),
                 args,
-                Path("/tmp/v63_auto_tune_test.jsonl"),
+                Path("/tmp/v64_auto_tune_test.jsonl"),
                 {field: 1.0 for field in module.AUTOTUNE_FIELDS},
                 100.0,
                 {"available": True},
@@ -783,7 +841,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         self.assertEqual(generate.call_count, 2)
         self.assertEqual(result["best_score"], 100.0)
 
-    def test_auto_tune_v63_adaptive_iterations_continue_from_accepted_best(self):
+    def test_auto_tune_v64_adaptive_iterations_continue_from_accepted_best(self):
         module = _load_auto_tune_module()
 
         class FakeClient:
@@ -826,7 +884,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
             result = module.run_auto_iterations(
                 FakeClient(),
                 args,
-                Path("/tmp/v63_auto_tune_test.jsonl"),
+                Path("/tmp/v64_auto_tune_test.jsonl"),
                 {field: 1.0 for field in module.AUTOTUNE_FIELDS},
                 100.0,
                 {"available": True},
@@ -838,7 +896,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         self.assertEqual(seen_configs[1]["pid_kp"], 0.7)
         self.assertEqual(result["best_score"], 70.0)
 
-    def test_auto_tune_v63_interrupt_restores_original_config(self):
+    def test_auto_tune_v64_interrupt_restores_original_config(self):
         module = _load_auto_tune_module()
 
         class FakeClient:
@@ -894,7 +952,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
                 KeyboardInterrupt,
             ]),
             patch.object(module, "write_record"),
-            patch.object(module, "_new_output_path", return_value=Path("/tmp/v63_auto_tune_test.jsonl")),
+            patch.object(module, "_new_output_path", return_value=Path("/tmp/v64_auto_tune_test.jsonl")),
             patch("builtins.print"),
         ):
             result = module.run_search(args)
@@ -902,7 +960,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         self.assertTrue(result["interrupted"])
         self.assertEqual(fake_client.updates[-1], {field: 1.0 for field in module.AUTOTUNE_FIELDS})
 
-    def test_auto_tune_v63_auto_trigger_enables_and_force_disables_aim(self):
+    def test_auto_tune_v64_auto_trigger_enables_and_force_disables_aim(self):
         module = _load_auto_tune_module()
 
         class FakeClient:
@@ -969,7 +1027,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
                 "hard_failure": False,
             }),
             patch.object(module, "write_record"),
-            patch.object(module, "_new_output_path", return_value=Path("/tmp/v63_auto_tune_test.jsonl")),
+            patch.object(module, "_new_output_path", return_value=Path("/tmp/v64_auto_tune_test.jsonl")),
             patch("builtins.print"),
         ):
             result = module.run_search(args)
@@ -977,7 +1035,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
         self.assertEqual(fake_client.active_calls, [True, False])
         self.assertTrue(result["auto_trigger"])
 
-    def test_auto_tune_v63_auto_trigger_force_disables_after_interrupt(self):
+    def test_auto_tune_v64_auto_trigger_force_disables_after_interrupt(self):
         module = _load_auto_tune_module()
 
         class FakeClient:
@@ -1038,7 +1096,7 @@ class V63ClassAwareTunerTests(unittest.TestCase):
                 KeyboardInterrupt,
             ]),
             patch.object(module, "write_record"),
-            patch.object(module, "_new_output_path", return_value=Path("/tmp/v63_auto_tune_test.jsonl")),
+            patch.object(module, "_new_output_path", return_value=Path("/tmp/v64_auto_tune_test.jsonl")),
             patch("builtins.print"),
         ):
             result = module.run_search(args)

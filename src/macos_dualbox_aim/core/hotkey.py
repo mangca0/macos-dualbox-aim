@@ -36,6 +36,7 @@ class HotkeyMonitor:
         self.trigger_active = False
         self.toggle_state = False
         self.lock_active = False
+        self.override_active = False
         self.lock_key_pressed = False
         self.thread: Optional[threading.Thread] = None
         self.button_state = {
@@ -88,6 +89,16 @@ class HotkeyMonitor:
     def register_state_change_callback(self, callback: Callable[[bool], None]):
         self.callbacks.append(callback)
 
+    def set_override_active(self, active: bool):
+        self.override_active = bool(active)
+        if self.override_active:
+            self._set_active(True)
+            self.trigger_active = True
+        else:
+            self.toggle_state = False
+            self.trigger_active = False
+            self._set_active(False)
+
     def _on_button_change(self, button: str, pressed: bool):
         self.button_state[button] = pressed
         if self.config.enable_lock_key and button == self.config.lock_key:
@@ -104,12 +115,21 @@ class HotkeyMonitor:
             self.lock_key_pressed = pressed
 
     def _check_trigger(self):
+        if self.override_active:
+            if not self.trigger_active:
+                self._set_active(True)
+                self.trigger_active = True
+            return
+
         primary_pressed = self.button_state.get(self.config.trigger_button, False)
         secondary_pressed = False
         if self.config.trigger_button_secondary:
             secondary_pressed = self.button_state.get(self.config.trigger_button_secondary, False)
 
-        should_trigger = False if (self.config.enable_lock_key and self.lock_active) else (primary_pressed or secondary_pressed)
+        physical_trigger = primary_pressed or secondary_pressed
+        should_trigger = bool(physical_trigger)
+        if self.config.enable_lock_key and self.lock_active:
+            should_trigger = False
         if self.config.toggle_mode:
             if should_trigger and not self.trigger_active:
                 self.toggle_state = not self.toggle_state

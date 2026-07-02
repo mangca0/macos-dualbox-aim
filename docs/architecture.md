@@ -32,8 +32,9 @@ surfaces and should not be extended.
 
 ## Version Roles
 
-V6.3 is the current recommended runtime and marks the present stage closure.
-Earlier versions remain as rollback references or isolated experiments.
+V7 is the current active runtime experiment. V6.3 remains the previous
+practical baseline and stage closure for the shared CoreML/crosshair/tracker
+chain. Earlier versions remain as rollback references or isolated experiments.
 
 | Version | Role |
 |---|---|
@@ -45,7 +46,8 @@ Earlier versions remain as rollback references or isolated experiments.
 | V6 | Standalone CoreML runtime, learned MPID control, and multi-object tracker target selection |
 | V6.1 | V6 plus adaptive near-target integral gating and configurable target-jump reset |
 | V6.2 | V6.1 plus color-detected crosshair aim reference |
-| V6.3 | Current recommended runtime: V6.2 plus model-aware target class selection and tuner class picking |
+| V6.3 | Previous practical baseline: V6.2 plus model-aware target class selection and tuner class picking |
+| V7 | Current active experiment: V6.3 real chain with strict incremental PID learning-controller replica |
 
 Future versions should not fork capture-card or model-runtime plumbing. If a
 shared change is needed, make it in `core` and keep the version layer thin.

@@ -4,7 +4,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from .config import AimbotConfigV63
+from .config import AimbotConfigV64
 from .crosshair import CrosshairDetector
 from .tracker import BoundingBox, DetectionObject, KalmanP
 from ..core.kmbox import KmboxConfig, KmboxNet, SUCCESS
@@ -51,6 +51,10 @@ class IncrementalPid:
         self.previous_error = 0.0
         self.previous_previous_error = 0.0
         self.integral_gain = 0.0
+
+    def decay_output(self, factor):
+        self.output *= _clamp(float(factor), 0.0, 1.0)
+        self.previous_output = self.output
 
     def set_output_limits(self, min_val, max_val):
         self.output_min = float(min_val)
@@ -112,6 +116,15 @@ class DerivativePredictor:
         self.smooth_acc_y = 0.0
         self.has_last = False
 
+    def decay_axis(self, axis, factor):
+        factor = _clamp(float(factor), 0.0, 1.0)
+        if axis == "x":
+            self.smooth_vel_x *= factor
+            self.smooth_acc_x *= factor
+        elif axis == "y":
+            self.smooth_vel_y *= factor
+            self.smooth_acc_y *= factor
+
     def predict(self, error_x, error_y, prev_move_x, prev_move_y, dt):
         if not self.has_last:
             self.last_error_x = error_x
@@ -168,6 +181,11 @@ class PIDController:
         pid_integral_gate_enabled=True,
         pid_integral_gate_threshold=50.0,
         pid_integral_gate_rate=0.025,
+        stop_brake_enabled=True,
+        stop_brake_radius=18.0,
+        stop_brake_output_decay=0.35,
+        stop_brake_pred_decay=0.2,
+        stop_brake_min_output=35.0,
         **_ignored,
     ):
         self._base_kp = float(kp)
@@ -184,6 +202,11 @@ class PIDController:
         self.pred_weight_x = max(0.0, min(1.0, float(pred_weight_x)))
         self.pred_weight_y = max(0.0, min(1.0, float(pred_weight_y)))
         self.target_jump_reset = max(0.0, float(target_jump_reset))
+        self.stop_brake_enabled = bool(stop_brake_enabled)
+        self.stop_brake_radius = max(0.0, float(stop_brake_radius))
+        self.stop_brake_output_decay = _clamp(float(stop_brake_output_decay), 0.0, 1.0)
+        self.stop_brake_pred_decay = _clamp(float(stop_brake_pred_decay), 0.0, 1.0)
+        self.stop_brake_min_output = max(0.0, float(stop_brake_min_output))
         self._configure_integral_gates(
             enabled=pid_integral_gate_enabled,
             threshold=pid_integral_gate_threshold,
@@ -237,6 +260,16 @@ class PIDController:
             self.pred_weight_y = max(0.0, min(1.0, float(kwargs["pred_weight_y"])))
         if kwargs.get("target_jump_reset") is not None:
             self.target_jump_reset = max(0.0, float(kwargs["target_jump_reset"]))
+        if kwargs.get("stop_brake_enabled") is not None:
+            self.stop_brake_enabled = bool(kwargs["stop_brake_enabled"])
+        if kwargs.get("stop_brake_radius") is not None:
+            self.stop_brake_radius = max(0.0, float(kwargs["stop_brake_radius"]))
+        if kwargs.get("stop_brake_output_decay") is not None:
+            self.stop_brake_output_decay = _clamp(float(kwargs["stop_brake_output_decay"]), 0.0, 1.0)
+        if kwargs.get("stop_brake_pred_decay") is not None:
+            self.stop_brake_pred_decay = _clamp(float(kwargs["stop_brake_pred_decay"]), 0.0, 1.0)
+        if kwargs.get("stop_brake_min_output") is not None:
+            self.stop_brake_min_output = max(0.0, float(kwargs["stop_brake_min_output"]))
         if (
             kwargs.get("pid_integral_gate_enabled") is not None
             or kwargs.get("pid_integral_gate_threshold") is not None
@@ -316,6 +349,17 @@ class PIDController:
             self._predictor.reset()
             pred_x = pred_y = 0.0
 
+        brake_x = self._should_stop_brake_axis(raw_x, self._last_raw_x, self._last_output_x)
+        brake_y = self._should_stop_brake_axis(raw_y, self._last_raw_y, self._last_output_y)
+        if brake_x:
+            self._predictor.decay_axis("x", self.stop_brake_pred_decay)
+            self._pid_x.decay_output(self.stop_brake_output_decay)
+            pred_x *= self.stop_brake_pred_decay
+        if brake_y:
+            self._predictor.decay_axis("y", self.stop_brake_pred_decay)
+            self._pid_y.decay_output(self.stop_brake_output_decay)
+            pred_y *= self.stop_brake_pred_decay
+
         fused_x = raw_x + pred_x * self.pred_weight_x
         fused_y = raw_y + pred_y * self.pred_weight_y
 
@@ -327,6 +371,13 @@ class PIDController:
         out_x = _clamp(out_x, -cap, cap)
         out_y = _clamp(out_y, -cap, cap)
 
+        if brake_x:
+            out_x = self._cap_braked_output(out_x, raw_x)
+            self._pid_x.output = out_x
+        if brake_y:
+            out_y = self._cap_braked_output(out_y, raw_y)
+            self._pid_y.output = out_y
+
         out_x *= self.sensitivity
         out_y *= self.sensitivity
 
@@ -336,6 +387,21 @@ class PIDController:
         self._last_output_y = out_y
 
         return float(self._trunc_to_int(out_x)), float(self._trunc_to_int(out_y))
+
+    def _should_stop_brake_axis(self, raw, previous_raw, previous_output):
+        if not self.stop_brake_enabled or self.stop_brake_radius <= 0.0:
+            return False
+        if abs(previous_output) < self.stop_brake_min_output:
+            return False
+        if abs(raw) > self.stop_brake_radius:
+            return False
+        moved_into_brake_zone = abs(previous_raw) > abs(raw)
+        output_still_closing = previous_output * raw > 0.0
+        return moved_into_brake_zone and output_still_closing
+
+    def _cap_braked_output(self, output, raw):
+        cap = max(1.0, abs(raw) * 1.25)
+        return _clamp(output, -cap, cap)
 
 
 @dataclass
@@ -368,8 +434,8 @@ def _mean(values: List[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
-class AimbotV63:
-    def __init__(self, config: AimbotConfigV63):
+class AimbotV64:
+    def __init__(self, config: AimbotConfigV64):
         self.config = config
         self.selected_class_ids = set(config.selected_class_ids or [])
         self.tracker = self._new_tracker()
@@ -390,6 +456,11 @@ class AimbotV63:
             pid_integral_gate_enabled=config.pid_integral_gate_enabled,
             pid_integral_gate_threshold=config.pid_integral_gate_threshold,
             pid_integral_gate_rate=config.pid_integral_gate_rate,
+            stop_brake_enabled=config.stop_brake_enabled,
+            stop_brake_radius=config.stop_brake_radius,
+            stop_brake_output_decay=config.stop_brake_output_decay,
+            stop_brake_pred_decay=config.stop_brake_pred_decay,
+            stop_brake_min_output=config.stop_brake_min_output,
         )
         self.kmbox: Optional[KmboxNet] = None
         self.active = False
